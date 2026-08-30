@@ -936,6 +936,7 @@
         state.projectId = db.projects.length ? db.projects[0].id : null;
         const p = getProject();
         if (p && p.scenes.length) state.sceneId = p.scenes[0].id;
+        state.tab = landingTab(p);
         gate.hidden = true;
         renderAll();
         subscribeRealtime();
@@ -952,6 +953,7 @@
       const sceneItem = (p, type, sceneId) => p.items.find(i => i.type === type && i.sceneId === sceneId);
       const roleUser = (p, role) => { const m = (p.members || []).find(x => x.role === role); return m ? userById(m.userId) : curUser(); };
       const itemsOf = (p, type) => p.items.filter(i => i.type === type);
+      const landingTab = p => (p && p.scenes.length) ? 'scenes' : 'pipeline';
       const CONCEPT_TITLE = '内容概要';
       const conceptItem = p => itemsOf(p, 'script').find(i => i.title === CONCEPT_TITLE) || null;
       const scriptItem = p => itemsOf(p, 'script').find(i => i.title !== CONCEPT_TITLE) || null;
@@ -1221,7 +1223,7 @@
         if (state.projectId === id) {
           state.projectId = db.projects.length ? db.projects[0].id : null;
           const np = getProject();
-          state.tab = 'scenes';
+          state.tab = landingTab(np);
           state.sceneId = np && np.scenes.length ? np.scenes[0].id : null;
           state.sel = null;
           state.selVersion = null;
@@ -2022,13 +2024,13 @@ ${script}
           renderSidebar();
         });
         const tabs = [
-          ['scenes', '场景', p.scenes.length],
+          ['pipeline', 'AI 流水线', p.stage === 'done' ? '✓' : `${stageIdx(p.stage || 'topic') + 1}/5`],
           ['script', '脚本', itemsOf(p, 'script').length],
+          ['scenes', '场景', p.scenes.length],
+          ['assets', '资产', p.assets.length],
           ['images', '图片', itemsOf(p, 'image').length],
           ['videos', '视频片段', itemsOf(p, 'video').length],
-          ['copy', '文案版本', itemsOf(p, 'copy').reduce((n, i) => n + i.versions.length, 0)],
-          ['assets', '资产', p.assets.length],
-          ['pipeline', 'AI 流水线', p.stage === 'done' ? '✓' : `${stageIdx(p.stage || 'topic') + 1}/5`]
+          ['copy', '文案版本', itemsOf(p, 'copy').reduce((n, i) => n + i.versions.length, 0)]
         ];
         viewTabs.innerHTML = tabs.map(([key, label, count]) => `<button type="button" class="${state.tab === key ? 'active' : ''}" data-tab="${key}">${label}<span class="cnt">${count}</span></button>`).join('');
         viewTabs.querySelectorAll('[data-tab]').forEach(btn => btn.addEventListener('click', () => { state.tab = btn.dataset.tab; renderWorkspace(); }));
@@ -2571,7 +2573,7 @@ ${script}
       function openProject(id) {
         state.projectId = id;
         const p = getProject();
-        state.tab = 'scenes';
+        state.tab = landingTab(p);
         state.sceneId = p && p.scenes.length ? p.scenes[0].id : null;
         state.stageKind = 'image';
         state.sel = null;
