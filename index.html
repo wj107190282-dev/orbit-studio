@@ -1912,7 +1912,8 @@ ${script}
           const refsOk = (s.assetIds || []).every(id => { const a = p.assets.find(x => x.id === id); return a && a.primarySrc; });
           return refsOk && !(it && currentSrc(it));
         }).length;
-        const allDone = p.scenes.length && p.scenes.every(s => { const v = sceneItem(p, 'video', s.id); return v && currentSrc(v); });
+        const vidReady = p.scenes.filter(s => { const v = sceneItem(p, 'video', s.id); return v && currentSrc(v); }).length;
+        const allDone = p.scenes.length && vidReady === p.scenes.length;
         return `<div class="pipe-block">
           <h3>① 数字资产图 <span class="gk">${assetReady}/${p.assets.length}</span></h3>
           <p class="pipe-sub">先把角色/环境/道具生成出来，它们的主图会作为参考图保证各场景一致。要改提示词去「资产」标签页。</p>
@@ -1932,6 +1933,16 @@ ${script}
           </div>` : ''}
           <div class="pipe-actions"><span style="flex:1"></span>
             ${allDone ? '<button class="pill sm solid" type="button" id="pipeFinish">完成流水线</button>' : '<span class="pipe-hint">全部场景出片后可标记完成</span>'}
+          </div>
+        </div>
+        <div class="pipe-block">
+          <h3>③ 成片 <span class="gk">${vidReady}/${p.scenes.length}</span></h3>
+          <p class="pipe-sub">按场景顺序接成一条完整视频，转场用分镜里定好的方式。拼接在你自己电脑上完成，又快又不花钱。</p>
+          <div class="pipe-actions">
+            <button class="pill sm accent" type="button" id="exportFilm" ${vidReady ? '' : 'disabled'}>导出成片清单</button>
+            <span class="pipe-hint">${vidReady === p.scenes.length && p.scenes.length
+              ? '下载后双击「成片合成」，几分钟后得到完整视频。'
+              : (vidReady ? `还有 ${p.scenes.length - vidReady} 个场景没出视频，现在导出只会包含已完成的部分。` : '先把场景视频生成出来。')}</span>
           </div>
         </div>`;
       }
@@ -2034,6 +2045,35 @@ ${script}
             run: () => genSceneImage(p, s, { silent: true }),
             count: () => { const it = sceneItem(getProject(), 'image', s.id); return it ? it.versions.length : 0; }
           })), '批量生成画面'));
+        on('exportFilm', () => {
+          const clips = [];
+          p.scenes.forEach((s, i) => {
+            const v = sceneItem(p, 'video', s.id);
+            const src = v ? currentSrc(v) : null;
+            if (!src) return;
+            // 转场取自分镜的「剪辑」字段；写了叠化/淡入淡出就做叠化，否则硬切
+            const dissolve = /叠化|淡|溶|渐/.test(s.edit || '');
+            clips.push({
+              n: i + 1, title: s.title || `场景 ${i + 1}`, url: src,
+              in: 0, out: null,
+              transition: { type: dissolve ? 'dissolve' : 'cut', duration: 0.5 },
+              transitionLabel: s.edit || '', caption: '', note: s.action || ''
+            });
+          });
+          if (!clips.length) { toast('还没有可用的场景视频'); return; }
+          const manifest = {
+            project: p.title || '未命名', exportedAt: now(),
+            output: { width: 1920, height: 1080, fps: 24 },
+            clips, audio: { music: null, musicVolume: 0.35 }
+          };
+          const blob = new Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json' });
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = `成片清单-${(p.title || '未命名').replace(/[\\/:*?"<>|]/g, '_')}.json`;
+          document.body.appendChild(a); a.click(); a.remove();
+          setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+          toast(`清单已下载（${clips.length} 段）。双击「成片合成」即可拼接。`);
+        });
         on('pipeFinish', async () => { await saveProjectPatch(p, { stage: 'done' }, { stage: 'done' }); toast('流水线完成 — 去「场景」页看成片'); state.tab = 'scenes'; renderWorkspace(); });
       }
 
