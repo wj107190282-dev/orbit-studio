@@ -1,0 +1,2671 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="AI 视频协作工作台 · 云端版（Supabase）" />
+  <title>ORBIT STUDIO · 协作工作台（云端版）</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600&display=swap');
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    button, input, select, textarea { font: inherit; }
+    button { cursor: pointer; }
+    /* ===== 协作工作台 v4 · 放映间（方向 C）：画面与时间轴为主角的浅色制作台。选题索引页数据与样式完整保留 ===== */
+    :root {
+      /* 强调色 · 拉丝钢（改这里即可全局换色） */
+      --ac: #4a4842;
+      --ac-dark: #33312c;
+      --ac-edge: #33312c;
+      --ac-rgb: 74, 72, 66;
+      --ac-metal: linear-gradient(180deg,#8b877e 0%,#67635b 14%,#4e4b45 44%,#403d38 50%,#4a4741 56%,#615d56 86%,#7d7970 100%);
+      --ac-metal-hover: linear-gradient(180deg,#7e7a71 0%,#5b574f 14%,#44413b 44%,#37342f 50%,#413e38 56%,#56524b 86%,#706c63 100%);
+      --ac-brush: repeating-linear-gradient(90deg,rgba(255,255,255,.05) 0 1px,rgba(0,0,0,.05) 1px 2px);
+      --ac-hi: rgba(255,255,255,.3);
+      --ac-sheen: linear-gradient(90deg,#3b3934 0%,#6e6a61 50%,#3b3934 100%);
+    }
+    body.collab-mode { min-width: 320px; color: #211e19; background: #f3f1ec; font-family: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", sans-serif; letter-spacing: 0; }
+    body.collab-mode > .topbar, body.collab-mode > .hero, body.collab-mode > main:not(.collab-main) { display: none !important; }
+    body:not(.collab-mode) .collab-shell, body:not(.collab-mode) .st-scrim, body:not(.collab-mode) .side-panel, body:not(.collab-mode) .inspector-panel { display: none !important; }
+    .back-to-studio { display: none; }
+    body:not(.collab-mode) .back-to-studio { display: inline-flex; align-items: center; gap: 6px; position: fixed; right: 18px; bottom: 18px; z-index: 90; border: 1px solid var(--ac); border-radius: 999px; background: var(--ac); color: #f6f4ef; padding: 10px 18px; font: 600 12.5px/1 "Noto Sans SC", sans-serif; box-shadow: 0 12px 30px rgba(var(--ac-rgb), .3); cursor: pointer; }
+
+    .collab-shell { display: flex; flex-direction: column; width: 100%; height: 100vh; min-height: 620px; margin: 0 auto; padding: 0 44px; box-sizing: border-box; }
+    .studio-bar, #projectHead, .view-tabs { flex: none; }
+    .collab-shell select, .collab-shell textarea, .collab-shell input, .side-panel select, .side-panel input, .inspector-panel select, .inspector-panel textarea { font: inherit; color: inherit; }
+    .collab-shell textarea, .inspector-panel textarea { resize: vertical; }
+    .gk { font-family: "Space Grotesk", "Avenir Next", sans-serif; }
+
+    /* ---- 顶条 ---- */
+    .studio-bar { display: flex; align-items: center; gap: 20px; height: 52px; border-bottom: 1px solid #ddd7cb; }
+    .st-iconbtn { display: grid; place-items: center; flex: none; width: 34px; height: 34px; border: 1px solid #d3ccbd; border-radius: 10px; background: transparent; color: #211e19; font-size: 14px; line-height: 0; padding: 0; cursor: pointer; }
+    .st-iconbtn svg { display: block; }
+    .st-iconbtn:hover { border-color: var(--ac); color: var(--ac); }
+    .studio-brand { font-family: "Space Grotesk", "Avenir Next", sans-serif; font-size: 11px; font-weight: 600; letter-spacing: .18em; color: #211e19; white-space: nowrap; }
+    .studio-crumb { min-width: 0; flex: 1; margin: 0; color: #a49c8e; font-size: 10.5px; letter-spacing: .04em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .st-identity { display: flex; align-items: center; gap: 7px; color: #a49c8e; font-size: 10px; white-space: nowrap; }
+    .st-identity select { max-width: 150px; border: 1px solid #d3ccbd; border-radius: 999px; background: transparent; color: #211e19; font-size: 11px; padding: 5px 12px; outline: none; cursor: pointer; appearance: none; }
+    .st-identity select:focus { border-color: var(--ac); }
+    .bar-link { border: 0; background: none; padding: 0; color: var(--ac); font-size: 11px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; cursor: pointer; white-space: nowrap; }
+    .bar-link:hover { color: var(--ac-dark); }
+
+    /* ---- 项目条 ---- */
+    .proj-strip { display: flex; align-items: center; justify-content: space-between; gap: 26px; padding: 20px 0 16px; }
+    .ps-title { margin: 0; max-width: none; color: #211e19; font-size: 21px; font-weight: 700; line-height: 1.3; letter-spacing: .01em; }
+    .ps-sub { margin: 5px 0 0; color: #6e675d; font-size: 11px; line-height: 1.6; }
+    .ps-sub .gk { color: #a49c8e; }
+    .ps-side { display: flex; flex: none; align-items: center; gap: 16px; }
+    .ps-progress { color: #211e19; font-family: "Space Grotesk", sans-serif; font-size: 13px; font-weight: 600; letter-spacing: .04em; white-space: nowrap; }
+    .ps-progress i { font-style: normal; color: #a49c8e; }
+    select.pill-select { appearance: none; border: 1px solid var(--ac); border-radius: 999px; background: transparent; color: var(--ac); font-size: 11px; font-weight: 700; padding: 6px 14px; outline: none; cursor: pointer; text-align: center; }
+    select.pill-select:focus-visible { outline: 2px solid rgba(var(--ac-rgb), .35); outline-offset: 2px; }
+    .people { display: flex; }
+    .st-avatar { display: inline-grid; place-items: center; flex: none; width: 24px; height: 24px; border: 2px solid #f3f1ec; border-radius: 50%; color: #fff; font-size: 9px; font-weight: 700; font-style: normal; }
+    .people .st-avatar + .st-avatar { margin-left: -6px; }
+    .st-avatar.sm { width: 16px; height: 16px; border-width: 1px; font-size: 7.5px; }
+
+    /* ---- 分区页签 ---- */
+    .view-tabs { display: flex; gap: 24px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; border-bottom: 1px solid #ddd7cb; }
+    .view-tabs::-webkit-scrollbar { display: none; }
+    .view-tabs button { flex: none; border: 0; border-bottom: 2px solid transparent; background: none; padding: 2px 1px 11px; color: #6e675d; font-size: 12.5px; cursor: pointer; white-space: nowrap; }
+    .view-tabs button:hover { color: var(--ac); }
+    .view-tabs button.active { color: #211e19; font-weight: 700; border-color: var(--ac); }
+    .view-tabs .cnt { margin-left: 4px; color: #a49c8e; font-family: "Space Grotesk", sans-serif; font-size: 10px; }
+
+    .collab-main { max-width: none; width: auto; margin: 0; min-width: 0; flex: 1; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; padding: 22px 0 26px; }
+    #viewRoot { display: flex; flex: 1; min-height: 0; flex-direction: column; }
+
+    /* ---- 状态点 ---- */
+    .st-dot { display: inline-block; flex: none; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+    .st-word { display: inline-flex; align-items: center; gap: 6px; font: 600 9.5px/1 "IBM Plex Mono", "SFMono-Regular", Menlo, monospace; letter-spacing: .05em; white-space: nowrap; }
+    .s-done { color: #2c7a52; }
+    .s-doing { color: var(--ac); }
+    .s-review { color: #a86a1f; }
+    .s-todo { color: #a49c8e; }
+    .s-none { color: #d6d0c2; }
+    .who { display: inline-flex; align-items: center; gap: 6px; color: #6e675d; font-size: 10.5px; white-space: nowrap; }
+    .who strong { color: #211e19; font-weight: 600; }
+    .sec-legend { display: flex; align-items: center; gap: 14px; margin-left: auto; }
+    .sec-legend .st-word { font-size: 9px; }
+
+    /* ---- 圆角胶囊按钮 ---- */
+    .pill { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #c9c1b1; border-radius: 999px; background: transparent; color: #211e19; font-size: 11.5px; font-weight: 500; padding: 7px 15px; cursor: pointer; white-space: nowrap; transition: border-color .15s, color .15s, background .15s; }
+    .pill:hover { border-color: #211e19; }
+    .pill.accent { border-color: var(--ac); color: var(--ac); }
+    .pill.accent:hover { background: rgba(var(--ac-rgb), .07); }
+    .pill.solid { border-color: var(--ac); background: var(--ac); color: #f6f4ef; }
+    .pill.solid:hover { background: var(--ac-dark); }
+    .pill.sm { padding: 4px 11px; font-size: 10.5px; }
+    .pill .gk { font-size: 10px; color: inherit; opacity: .75; }
+    .pill:focus-visible, .cell:focus-visible, .prod-chip:focus-visible, .g-card:focus-visible, .v-row:focus-visible, .ver-chip:focus-visible, .proj-card:focus-visible { outline: 2px solid rgba(var(--ac-rgb), .4); outline-offset: 2px; }
+    .mini-link { border: 0; background: none; padding: 0; color: var(--ac); font: 500 10px/1.4 "IBM Plex Mono", Menlo, monospace; text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; cursor: pointer; white-space: nowrap; }
+    .mini-link:hover { color: var(--ac-dark); }
+
+    /* ---- 场景：舞台 ---- */
+    .stage-row { display: flex; gap: 44px; align-items: stretch; flex: 1; min-height: 0; }
+    .stage-info { display: flex; flex: none; flex-direction: column; gap: 11px; width: clamp(340px, 24vw, 470px); padding-top: 6px; overflow-y: auto; }
+    .k-scene { margin: 0; color: var(--ac); font-family: "Space Grotesk", sans-serif; font-size: 10.5px; font-weight: 600; letter-spacing: .22em; }
+    .k-time { margin: 0; color: #211e19; font-family: "Space Grotesk", sans-serif; font-size: 29px; font-weight: 500; line-height: 1.05; letter-spacing: .01em; }
+    .k-title { margin: 0; color: #211e19; font-size: 21px; font-weight: 700; letter-spacing: .01em; }
+    .k-action { margin: 0; color: #55503f; font-size: 12.5px; line-height: 1.95; }
+    .k-extra { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid #ddd7cb; padding-top: 12px; }
+    .k-extra > div { display: flex; gap: 10px; }
+    .k-extra b { flex: none; width: 30px; color: #211e19; font-size: 10.5px; font-weight: 700; }
+    .k-extra span { color: #6e675d; font-size: 11px; line-height: 1.7; }
+    .k-btns { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 4px; }
+    .stage-col { display: flex; flex: 1; min-width: 0; min-height: 0; flex-direction: column; gap: 10px; }
+    .prod-chips, .stage-cap { flex: none; }
+    .prod-chips { display: flex; gap: 8px; }
+    .prod-chip { display: inline-flex; align-items: center; gap: 7px; border: 1px solid #c9c1b1; border-radius: 999px; background: transparent; color: #6e675d; font-size: 11px; font-weight: 500; padding: 6px 13px; cursor: pointer; }
+    .prod-chip:hover { border-color: #211e19; color: #211e19; }
+    .prod-chip.active { border-color: var(--ac); background: rgba(var(--ac-rgb), .08); color: #211e19; font-weight: 700; }
+    .prod-chip.mk { border-style: dashed; }
+    .stage { position: relative; width: 100%; flex: 1; min-height: 240px; border: 1px solid #d3ccbd; background: #e9e5db; overflow: hidden; box-shadow: 0 18px 44px rgba(60, 52, 38, .13); box-sizing: border-box; }
+    .stage.is-item { cursor: pointer; }
+    .stage img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .stage.is-video img { opacity: .8; }
+    .stage-overlay { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); border: 1px solid rgba(33, 30, 25, .25); border-radius: 999px; background: rgba(246, 244, 239, .92); color: #211e19; font-size: 11px; font-weight: 600; padding: 8px 18px; white-space: nowrap; }
+    .stage-doc { display: flex; flex-direction: column; gap: 10px; height: 100%; padding: 26px 30px; box-sizing: border-box; overflow-y: auto; background: #faf9f5; }
+    .stage-doc > div { display: flex; gap: 12px; }
+    .stage-doc b { flex: none; width: 32px; color: #211e19; font-size: 11px; font-weight: 700; padding-top: 1px; }
+    .stage-doc span { color: #55503f; font-size: 12px; line-height: 1.85; }
+    .stage-ph { display: flex; align-items: center; justify-content: center; height: 100%; color: #a49c8e; font-size: 11px; line-height: 1.7; text-align: center; padding: 20px; box-sizing: border-box; }
+    .stage-cap { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+    .stage-cap-l { min-width: 0; color: #6e675d; font: 400 10px/1.5 "IBM Plex Mono", Menlo, monospace; letter-spacing: .03em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .stage-cap-r { display: flex; flex: none; align-items: center; gap: 10px; }
+
+    /* ---- 胶片条 ---- */
+    .filmstrip { display: flex; flex: none; gap: 10px; overflow-x: auto; margin-top: 22px; padding-bottom: 4px; }
+    .cell { display: flex; flex: 1 1 150px; max-width: 280px; flex-direction: column; gap: 6px; border: 0; background: none; padding: 0; text-align: left; cursor: pointer; }
+    .cell-thumb { width: 100%; aspect-ratio: 2.35 / 1; border: 1px solid #d3ccbd; box-sizing: border-box; background: #e9e5db; overflow: hidden; }
+    .cell-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .cell.active .cell-thumb { border: 2px solid var(--ac); }
+    .cell-ph { display: flex; align-items: center; justify-content: center; height: 100%; border: 1px dashed #b8b0a0; box-sizing: border-box; background: #edeae2; color: #a49c8e; font-size: 9.5px; }
+    .cell.active .cell-ph { border-style: solid; border-color: var(--ac); border-width: 2px; }
+    .cell-cap { display: flex; align-items: center; gap: 6px; color: #6e675d; font: 400 9px/1.4 "IBM Plex Mono", Menlo, monospace; white-space: nowrap; overflow: hidden; }
+    .cell-cap em { margin-left: auto; font-style: normal; font-family: "Space Grotesk", sans-serif; color: #a49c8e; }
+    .cell.active .cell-cap, .cell.active .cell-cap em { color: var(--ac); }
+    .cell.add { flex: 0 0 92px; }
+    .cell.add .cell-thumb { display: flex; align-items: center; justify-content: center; border: 1px dashed #b8b0a0; background: none; color: #6e675d; font-size: 11px; }
+    .cell.add:hover .cell-thumb { border-color: var(--ac); color: var(--ac); }
+    .scene-add { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto; gap: 14px; align-items: center; margin-top: 16px; border: 1px dashed #c9c1b1; border-radius: 12px; background: #f7f5f0; padding: 14px 16px; }
+    .scene-add[hidden] { display: none; }
+
+    .st-input { width: 100%; box-sizing: border-box; border: 1px solid #d3ccbd; border-radius: 9px; background: #faf9f5; color: #211e19; padding: 9px 12px; font-size: 12px; outline: none; transition: border-color .15s; }
+    .st-input:focus { border-color: var(--ac); }
+    .st-input::placeholder { color: #a49c8e; }
+    select.st-input { cursor: pointer; }
+
+    /* ---- 脚本 ---- */
+    .doc-head { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; padding-bottom: 16px; border-bottom: 1px solid #ddd7cb; cursor: pointer; }
+    .doc-head h2 { margin: 0; color: #211e19; font-size: 18px; font-weight: 700; }
+    .doc-head:hover h2 { color: var(--ac); }
+    .byline-mono { color: #a49c8e; font: 400 9.5px/1.5 "IBM Plex Mono", Menlo, monospace; letter-spacing: .03em; }
+    .screenplay { margin: 0; padding: 0; list-style: none; }
+    .sp-scene { display: grid; grid-template-columns: 118px minmax(0, 1fr); gap: 22px; padding: 18px 0; border-bottom: 1px solid #e2ddd1; }
+    .sp-tc { margin: 0; color: var(--ac); font-family: "Space Grotesk", sans-serif; font-size: 11px; font-weight: 600; line-height: 1.7; }
+    .sp-tc em { display: block; font-style: normal; color: #a49c8e; font-weight: 400; font-size: 10px; }
+    .sp-scene h3 { margin: 0 0 8px; color: #211e19; font-size: 14.5px; font-weight: 700; }
+    .sp-row { margin: 0 0 6px; color: #55503f; font-size: 12px; line-height: 1.85; }
+    .sp-row:last-child { margin-bottom: 0; }
+    .sp-row b { display: inline-block; min-width: 44px; color: #211e19; font-weight: 700; }
+    .sp-sources { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 18px 0 0; padding: 0; list-style: none; }
+    .sp-sources a { color: #6e675d; font: 400 10px/1.5 "IBM Plex Mono", Menlo, monospace; text-decoration-color: #b8b0a0; text-underline-offset: 3px; }
+    .sp-sources a:hover { color: var(--ac); }
+
+    /* ---- 图片 ---- */
+    .view-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 18px; }
+    .view-head h2 { margin: 0; color: #211e19; font-size: 16px; font-weight: 700; }
+    .view-head .gk { color: #a49c8e; font-size: 10px; letter-spacing: .16em; }
+    .gal { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 26px 24px; }
+    .g-card { margin: 0; padding: 0; border: 0; background: none; text-align: left; cursor: pointer; }
+    .g-thumb { width: 100%; aspect-ratio: 16 / 9; border: 1px solid #d3ccbd; box-sizing: border-box; background: #e9e5db; overflow: hidden; }
+    .g-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .g-card.selected .g-thumb { border: 2px solid var(--ac); }
+    .g-ph { display: flex; align-items: center; justify-content: center; height: 100%; border: 1px dashed #b8b0a0; box-sizing: border-box; background: #edeae2; color: #a49c8e; font-size: 10px; }
+    .g-cap { display: flex; flex-direction: column; gap: 4px; margin-top: 9px; }
+    .g-cap1 { color: #a49c8e; font: 400 9px/1.4 "IBM Plex Mono", Menlo, monospace; letter-spacing: .05em; }
+    .g-cap2 { color: #211e19; font-size: 13px; font-weight: 700; }
+    .g-card:hover .g-cap2 { color: var(--ac); }
+    .g-cap3 { display: flex; align-items: center; gap: 12px; margin-top: 1px; }
+
+    /* ---- 视频片段 ---- */
+    .v-rows { display: flex; flex-direction: column; }
+    .v-row { display: flex; align-items: center; gap: 16px; width: 100%; border: 0; border-bottom: 1px solid #e2ddd1; background: none; padding: 12px 0; text-align: left; cursor: pointer; }
+    .v-thumb { flex: none; width: 96px; aspect-ratio: 16 / 9; border: 1px solid #d3ccbd; box-sizing: border-box; background: #e9e5db; overflow: hidden; }
+    .v-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; opacity: .85; }
+    .v-thumb .g-ph { font-size: 8.5px; }
+    .v-no { flex: none; width: 34px; color: var(--ac); font-family: "Space Grotesk", sans-serif; font-size: 11px; font-weight: 600; }
+    .v-main { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+    .v-title { color: #211e19; font-size: 13px; font-weight: 700; }
+    .v-row:hover .v-title, .v-row.selected .v-title { color: var(--ac); }
+    .v-sub { color: #a49c8e; font: 400 9px/1.4 "IBM Plex Mono", Menlo, monospace; }
+    .v-row .st-word { margin-left: auto; }
+
+    /* ---- 文案版本 ---- */
+    .copy-wrap { max-width: 780px; }
+    .ver-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+    .ver-chip { border: 1px solid #c9c1b1; border-radius: 999px; background: transparent; color: #6e675d; font-size: 10.5px; font-weight: 600; padding: 5px 13px; cursor: pointer; }
+    .ver-chip:hover { border-color: #211e19; color: #211e19; }
+    .ver-chip.cur { border-color: var(--ac); color: var(--ac); }
+    .ver-chip.viewing { background: rgba(var(--ac-rgb), .1); border-color: var(--ac); color: var(--ac-dark); }
+    .copy-page { margin-top: 14px; border: 1px solid #d3ccbd; background: #faf9f5; padding: 24px 28px; color: #3c382c; font-size: 12.5px; line-height: 2; white-space: pre-wrap; word-break: break-word; box-shadow: 0 12px 30px rgba(60, 52, 38, .08); }
+    .copy-caption { margin: 9px 0 0; color: #a49c8e; font: 400 9px/1.6 "IBM Plex Mono", Menlo, monospace; letter-spacing: .04em; }
+    .copy-new { display: grid; gap: 12px; margin-top: 22px; padding-top: 18px; border-top: 1px solid #ddd7cb; }
+    .copy-new textarea, .cm-form textarea { width: 100%; box-sizing: border-box; border: 1px solid #d3ccbd; border-radius: 9px; background: #faf9f5; padding: 10px 12px; color: #211e19; font-size: 11.5px; line-height: 1.75; outline: none; }
+    .copy-new textarea:focus, .cm-form textarea:focus { border-color: var(--ac); }
+    .copy-new textarea { min-height: 92px; }
+    .copy-new .pill { justify-self: start; }
+
+    .ws-empty { border: 1px dashed #b8b0a0; border-radius: 12px; background: #f7f5f0; padding: 24px 28px; color: #55503f; font-size: 12px; line-height: 1.85; }
+    .ws-empty h2 { margin: 0 0 6px; color: #211e19; font-size: 14.5px; font-weight: 700; }
+    .topic-help { margin: 12px 0 0; color: #a49c8e; font-size: 10px; line-height: 1.75; }
+
+    /* ---- 左抽屉：项目 / 选题库 ---- */
+    .side-panel { position: fixed; top: 0; left: 0; bottom: 0; z-index: 75; display: flex; flex-direction: column; gap: 16px; width: min(340px, 88vw); overflow-y: auto; background: #f6f4ef; border-right: 1px solid #d3ccbd; box-shadow: 18px 0 44px rgba(37, 33, 24, .2); padding: 22px 20px 24px; transform: translateX(-105%); transition: transform .22s ease; }
+    .side-fold { border-top: 1px solid #e2ddd1; }
+    .side-fold summary { display: flex; align-items: baseline; gap: 10px; padding: 13px 0; cursor: pointer; list-style: none; color: #211e19; font-size: 12.5px; font-weight: 700; }
+    .side-fold summary::-webkit-details-marker { display: none; }
+    .side-fold summary::after { content: "＋"; margin-left: auto; color: #a49c8e; font-size: 12px; font-weight: 400; }
+    .side-fold[open] summary::after { content: "－"; }
+    .side-fold summary:hover { color: var(--ac); }
+    .fold-hint { color: #a49c8e; font: 400 9.5px/1 "IBM Plex Mono", Menlo, monospace; }
+    .fold-body { padding: 2px 0 16px; }
+    body.nav-open .side-panel { transform: none; }
+    .side-cap { margin: 0 0 10px; color: #a49c8e; font-family: "Space Grotesk", sans-serif; font-size: 10px; font-weight: 600; letter-spacing: .2em; }
+    .side-cap span { letter-spacing: .05em; margin-left: 6px; }
+    .proj-rows { display: flex; flex-direction: column; gap: 8px; }
+    .proj-card { display: flex; flex-direction: column; gap: 7px; width: 100%; border: 1px solid #d3ccbd; border-radius: 12px; background: #faf9f5; padding: 12px 13px; text-align: left; cursor: pointer; transition: border-color .15s; }
+    .proj-card:hover { border-color: var(--ac); }
+    .proj-card.active { border: 1.5px solid var(--ac); }
+    .proj-topic { color: #a49c8e; font: 400 9px/1.4 "IBM Plex Mono", Menlo, monospace; letter-spacing: .05em; }
+    .proj-card strong { color: #211e19; font-size: 13px; font-weight: 700; line-height: 1.4; }
+    .proj-bar { display: block; height: 3px; border-radius: 99px; background: #e2ddd1; overflow: hidden; }
+    .proj-bar i { display: block; height: 100%; border-radius: 99px; background: var(--ac); }
+    .proj-foot { color: #a49c8e; font: 400 9px/1.5 "IBM Plex Mono", Menlo, monospace; }
+    .side-panel .st-input { margin-bottom: 9px; }
+    .side-panel .pill { align-self: flex-start; }
+    .side-foot { margin-top: auto; padding-top: 14px; border-top: 1px solid #e2ddd1; display: flex; flex-direction: column; gap: 7px; }
+    .crew-lines { margin: 0; color: #8a8272; font-size: 10.5px; line-height: 1.7; }
+    .st-linkbtn { border: 0; background: none; padding: 0; width: fit-content; color: #a49c8e; font: 400 9.5px/1.5 "IBM Plex Mono", Menlo, monospace; text-decoration: underline dashed; text-underline-offset: 3px; cursor: pointer; }
+    .st-linkbtn:hover { color: #a86a1f; }
+
+    /* ---- 右抽屉：详情 ---- */
+    .inspector-panel { position: fixed; top: 0; right: 0; bottom: 0; z-index: 75; width: min(430px, 94vw); overflow-y: auto; background: #f6f4ef; border-left: 1px solid #d3ccbd; box-shadow: -18px 0 44px rgba(37, 33, 24, .2); padding: 20px 20px 44px; transform: translateX(105%); transition: transform .22s ease; box-sizing: border-box; }
+    body.drawer-open .inspector-panel { transform: none; }
+    .ins-cap { display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #ddd7cb; padding-bottom: 12px; }
+    .ins-cap p { margin: 0; color: #6e675d; font: 500 9.5px/1 "IBM Plex Mono", Menlo, monospace; letter-spacing: .16em; }
+    .ins-close { display: grid; place-items: center; flex: none; margin-left: auto; width: 28px; height: 28px; border: 1px solid #d3ccbd; border-radius: 999px; background: transparent; color: #6e675d; font-size: 14px; cursor: pointer; }
+    .ins-close:hover { border-color: var(--ac); color: var(--ac); }
+    .ins-title { margin: 14px 0 0; color: #211e19; font-size: 17px; font-weight: 700; line-height: 1.45; }
+    .ins-desc { margin: 6px 0 0; color: #6e675d; font-size: 11px; line-height: 1.75; }
+    .ins-preview { margin: 12px 0 0; position: relative; }
+    .ins-preview img { display: block; width: 100%; max-height: 200px; object-fit: cover; border: 1px solid #d3ccbd; box-sizing: border-box; }
+    .ins-preview .ph { display: flex; align-items: center; justify-content: center; min-height: 96px; border: 1px dashed #b8b0a0; background: #edeae2; padding: 14px; color: #a49c8e; font-size: 10.5px; line-height: 1.7; text-align: center; }
+    .ins-badge { display: inline-block; margin: 8px 0 0; color: var(--ac); font: 500 9px/1.5 "IBM Plex Mono", Menlo, monospace; letter-spacing: .05em; }
+    .ins-rows { margin-top: 12px; }
+    .ins-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid #e2ddd1; }
+    .ins-row > span:first-child { color: #a49c8e; font: 400 9px/1.4 "IBM Plex Mono", Menlo, monospace; letter-spacing: .1em; }
+    .ins-row strong { color: #211e19; font-size: 11px; font-weight: 600; text-align: right; }
+    .ins-row select { border: 1px solid #d3ccbd; border-radius: 999px; background: transparent; color: #211e19; font-size: 10.5px; padding: 4px 11px; outline: none; cursor: pointer; appearance: none; }
+    .ins-row select:focus { border-color: var(--ac); }
+    .ins-sec { margin-top: 18px; }
+    .ins-sec-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+    .ins-sec-head h4 { margin: 0; color: #211e19; font-size: 11.5px; font-weight: 700; }
+    .ins-sec-head h4 .gk { color: #a49c8e; font-size: 9.5px; font-weight: 500; margin-left: 4px; }
+    .ins-pre { margin: 0; border: 1px solid #ddd7cb; border-radius: 6px; background: #edeae2; padding: 12px 14px; color: #46412f; font: 400 10px/1.85 "IBM Plex Mono", Menlo, monospace; white-space: pre-wrap; word-break: break-word; }
+    .ver-list { margin: 0; padding: 0; list-style: none; }
+    .ver-item { display: block; width: 100%; border: 0; border-bottom: 1px solid #e2ddd1; background: none; padding: 8px 0; color: #55503f; font-size: 10.5px; line-height: 1.65; text-align: left; }
+    button.ver-item { cursor: pointer; }
+    button.ver-item:hover { color: var(--ac); }
+    .ver-item.viewing { background: rgba(var(--ac-rgb), .07); }
+    .ver-tag { margin-right: 7px; color: var(--ac); font-family: "Space Grotesk", sans-serif; font-size: 10.5px; font-weight: 600; }
+    .ver-meta { display: block; margin-top: 2px; color: #a49c8e; font: 400 8.5px/1.5 "IBM Plex Mono", Menlo, monospace; letter-spacing: .03em; }
+    .cm-list { display: flex; flex-direction: column; gap: 10px; }
+    .cm-item { display: flex; gap: 8px; }
+    .cm-head { color: #a49c8e; font-size: 10px; }
+    .cm-head strong { color: #211e19; font-weight: 700; font-size: 10.5px; }
+    .cm-item p { margin: 3px 0 0; color: #4c473a; font-size: 10.5px; line-height: 1.7; }
+    .cm-sys { margin: 0; padding-left: 24px; color: #a49c8e; font: 400 9px/1.6 "IBM Plex Mono", Menlo, monospace; }
+    .cm-sys strong { color: #6e675d; font-weight: 500; }
+    .cm-form { display: grid; gap: 10px; margin-top: 12px; }
+    .cm-form textarea { min-height: 58px; }
+    .cm-form .pill { justify-self: end; }
+
+    .st-scrim { position: fixed; inset: 0; z-index: 70; background: rgba(33, 29, 21, .38); }
+    .st-scrim[hidden] { display: none; }
+
+    /* ---- 生成工作流：提示词编辑 / 模型库 / 版本登记与删除 ---- */
+    .ins-row input[type="text"] { width: 178px; border: 1px solid #d3ccbd; border-radius: 8px; background: #faf9f5; color: #211e19; font-size: 10.5px; padding: 4px 9px; text-align: right; outline: none; }
+    .ins-row input[type="text"]:focus { border-color: var(--ac); }
+    .prompt-edit { display: grid; gap: 9px; }
+    .prompt-edit textarea { width: 100%; box-sizing: border-box; min-height: 150px; border: 1px solid #d3ccbd; border-radius: 6px; background: #faf9f5; padding: 11px 13px; color: #46412f; font: 400 10px/1.85 "IBM Plex Mono", Menlo, monospace; outline: none; resize: vertical; }
+    .prompt-edit textarea:focus { border-color: var(--ac); }
+    .prompt-edit .row { display: flex; gap: 8px; justify-content: flex-end; }
+    .pill.sm.solid { background: var(--ac); border-color: var(--ac); color: #f6f4ef; }
+    .ver-line { color: #55503f; font-size: 10.5px; line-height: 1.6; }
+    .ver-actions { display: inline-flex; gap: 10px; margin-left: 8px; }
+    .ver-del:hover { color: #a5482f; }
+    .ver-form { display: grid; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px dashed #ddd7cb; }
+    .ver-form .pill { justify-self: start; }
+    .ins-danger { margin-top: 24px; border-top: 1px dashed #ddd7cb; padding-top: 12px; }
+    .st-linkbtn.danger:hover { color: #a5482f; }
+    .stage video { display: block; width: 100%; height: 100%; object-fit: contain; background: #1c1a15; }
+    .ins-preview video { display: block; width: 100%; max-height: 220px; object-fit: contain; background: #1c1a15; }
+    .mk-kind { margin: 8px 0 6px; color: #a49c8e; font: 500 9px/1 "IBM Plex Mono", Menlo, monospace; letter-spacing: .14em; }
+    .mk-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .mk-chip { display: inline-flex; align-items: center; gap: 7px; border: 1px solid #d3ccbd; border-radius: 999px; background: #faf9f5; color: #55503f; font-size: 10.5px; padding: 4px 8px 4px 11px; }
+    .mk-chip button { border: 0; background: none; padding: 0; color: #a49c8e; font-size: 11px; line-height: 1; cursor: pointer; opacity: .3; transition: opacity .12s; }
+    .mk-chip:hover button, .mk-chip button:focus-visible { opacity: 1; }
+    .mk-chip button:hover { color: #a5482f; }
+    .mk-add { display: grid; grid-template-columns: 82px minmax(0, 1fr) auto; gap: 8px; align-items: center; margin-top: 12px; }
+    .mk-add .st-input { margin-bottom: 0; }
+    /* ---- 控件规格统一：覆盖 font:inherit 带来的 16px 默认字号 ---- */
+    input.st-input, select.st-input, textarea.st-input { font-size: 12px; }
+    .side-panel .st-input { font-size: 11.5px; padding: 8px 11px; border-radius: 8px; margin-bottom: 8px; height: auto; }
+    .side-panel select.st-input { height: 34px; padding: 0 11px; }
+    .fold-body .pill.solid { font-size: 11.5px; padding: 8px 16px; }
+    .mk-add { grid-template-columns: 76px minmax(0, 1fr) auto; }
+    .mk-add .st-input, .mk-add select.st-input { margin-bottom: 0; height: 32px; padding: 0 10px; font-size: 11px; box-sizing: border-box; }
+    .mk-add .pill.sm { height: 32px; padding: 0 13px; font-size: 10.5px; box-sizing: border-box; }
+    .scene-add .st-input { font-size: 12px; height: 36px; padding: 0 12px; box-sizing: border-box; }
+    .copy-new input.st-input { font-size: 12px; }
+    .ver-form .st-input { font-size: 11px; padding: 7px 10px; }
+    /* ---- 详情抽屉分页（详情/生成/版本/评论，降低滚动负担） ---- */
+    .ins-byline { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 9px; }
+    .ins-tabs { display: flex; gap: 6px; margin-top: 14px; }
+    .ins-tabs button { flex: 1; min-width: 0; border: 1px solid #d3ccbd; border-radius: 999px; background: transparent; color: #6e675d; font-size: 11px; padding: 6px 2px; cursor: pointer; white-space: nowrap; }
+    .ins-tabs button:hover { border-color: #211e19; color: #211e19; }
+    .ins-tabs button.active { border-color: var(--ac); background: rgba(var(--ac-rgb), .08); color: #211e19; font-weight: 700; }
+    .ins-tabs .gk { font-size: 9px; margin-left: 3px; color: #a49c8e; }
+    .ins-pane { margin-top: 15px; }
+    .ins-pane .ins-preview { margin-top: 0; }
+    .ins-pane .ins-danger { margin-top: 20px; }
+    /* ---- 下拉框统一自绘箭头：左右间距对称 ---- */
+    select.st-input, .ins-row select, .st-identity select, select.pill-select {
+      appearance: none; -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='10'%20height='10'%20fill='none'%20stroke='%236e675d'%20stroke-width='1.5'%3E%3Cpath%20d='M2%203.5%20L5%206.5%20L8%203.5'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 11px center;
+      background-size: 10px 10px;
+      padding-right: 30px;
+    }
+    .side-panel select.st-input { padding-right: 30px; }
+    .ins-row select { background-position: right 9px center; padding-right: 26px; }
+    .mk-add select.st-input { background-position: right 8px center; padding-right: 25px; }
+    select.pill-select { background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='10'%20height='10'%20fill='none'%20stroke='%234a4842'%20stroke-width='1.5'%3E%3Cpath%20d='M2%203.5%20L5%206.5%20L8%203.5'/%3E%3C/svg%3E"); background-position: right 12px center; padding: 6px 30px 6px 14px; text-align: left; }
+    /* ---- 项目卡片：压扁 + 悬停删除（两次点击确认） ---- */
+    .proj-rows { gap: 6px; }
+    .proj-card { gap: 5px; border-radius: 10px; padding: 9px 11px; }
+    .proj-line { display: flex; align-items: center; gap: 8px; }
+    .proj-card strong { flex: 1; min-width: 0; margin: 0; font-size: 12.5px; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .proj-del { flex: none; border: 0; border-radius: 6px; background: none; padding: 1px 4px; color: #a49c8e; font-size: 13px; line-height: 1.2; cursor: pointer; opacity: 0; transition: opacity .12s, color .12s; }
+    .proj-card:hover .proj-del, .proj-del:focus-visible, .proj-del[data-armed] { opacity: 1; }
+    .proj-del:hover { color: #a5482f; }
+    .proj-del[data-armed] { opacity: 1; color: #a5482f; background: rgba(165, 72, 47, .1); font-size: 10px; font-weight: 700; padding: 3px 7px; }
+    .proj-meta { color: #a49c8e; font: 400 9px/1.4 "IBM Plex Mono", Menlo, monospace; letter-spacing: .03em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .proj-bar { height: 2px; }
+    .fold-label { display: block; margin: 3px 2px 6px; color: #a49c8e; font-size: 10px; line-height: 1.5; }
+    /* ---- 拉丝钢金属填充：仅用于填充面（按钮 / 进度条），文字与描边仍用实色 ---- */
+    .pill.solid, .back-to-studio {
+      border-color: var(--ac-edge);
+      background-color: var(--ac);
+      background-image: var(--ac-brush), var(--ac-metal);
+      background-blend-mode: overlay, normal;
+      color: #f7f6f2;
+      box-shadow: inset 0 1px 0 var(--ac-hi), inset 0 -1px 0 rgba(0,0,0,.34), 0 1px 2px rgba(40,34,24,.18);
+      text-shadow: 0 1px 0 rgba(0,0,0,.28);
+    }
+    .pill.solid:hover, .back-to-studio:hover { background-image: var(--ac-brush), var(--ac-metal-hover); }
+    .pill.solid:active { box-shadow: inset 0 2px 4px rgba(0,0,0,.34); }
+    .proj-bar i { background: var(--ac-sheen); }
+    /* ---- AI 流水线 + 资产库 ---- */
+    .pipe-steps { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 6px; }
+    .pipe-step { display: inline-flex; align-items: center; gap: 7px; border: 1px solid #d3ccbd; border-radius: 999px; background: transparent; color: #6e675d; font-size: 11px; padding: 6px 13px; cursor: pointer; }
+    .pipe-step.done { color: #2c7a52; border-color: #bcd3c5; }
+    .pipe-step.active { border-color: var(--ac); background: rgba(var(--ac-rgb), .08); color: #211e19; font-weight: 700; }
+    .pipe-step.todo { cursor: default; opacity: .65; }
+    .pipe-pane { max-width: 880px; }
+    .pipe-block { border: 1px solid #ddd7cb; background: #faf9f5; padding: 18px 20px 16px; margin-top: 14px; }
+    .pipe-block h3 { margin: 0 0 6px; font-size: 14px; font-weight: 700; }
+    .pipe-sub { margin: 0 0 12px; color: #6e675d; font-size: 11.5px; line-height: 1.75; }
+    .pipe-ta { width: 100%; box-sizing: border-box; min-height: 190px; border: 1px solid #d3ccbd; border-radius: 6px; background: #fff; padding: 13px 15px; color: #2f2b22; font-size: 12.5px; line-height: 2; outline: none; resize: vertical; }
+    .pipe-ta:focus { border-color: var(--ac); }
+    .pipe-in { width: 100%; box-sizing: border-box; border: 1px solid #d3ccbd; border-radius: 6px; background: #fff; padding: 10px 12px; font-size: 12.5px; outline: none; }
+    .pipe-in:focus { border-color: var(--ac); }
+    .pipe-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 13px; }
+    .pipe-hint { color: #a49c8e; font-size: 10.5px; line-height: 1.7; }
+    .pipe-err { color: #a5482f; font-size: 11px; line-height: 1.7; }
+    .spin { display: inline-block; width: 11px; height: 11px; border: 2px solid rgba(var(--ac-rgb), .25); border-top-color: var(--ac); border-radius: 50%; animation: pipespin .7s linear infinite; vertical-align: -2px; }
+    @keyframes pipespin { to { transform: rotate(360deg); } }
+    .cand { display: block; width: 100%; border: 1px solid #ddd7cb; background: #fff; text-align: left; padding: 10px 13px; margin-top: 8px; cursor: pointer; }
+    .cand:hover { border-color: var(--ac); }
+    .cand b { display: block; font-size: 12.5px; }
+    .cand span { color: #6e675d; font-size: 10.5px; }
+    .bk-cols { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; margin-top: 12px; }
+    .bk-list { border: 1px solid #e2ddd1; background: #fff; padding: 10px 13px; max-height: 380px; overflow-y: auto; }
+    .bk-list h4 { margin: 0 0 7px; font-size: 11.5px; font-weight: 700; }
+    .bk-row { padding: 7px 0; border-top: 1px solid #eee9df; font-size: 11px; color: #55503f; line-height: 1.7; }
+    .bk-row b { color: #211e19; }
+    .bk-refs { color: var(--ac); font: 500 9.5px/1.5 "IBM Plex Mono", Menlo, monospace; }
+    .gen-rows { display: flex; flex-direction: column; margin-top: 6px; }
+    .gen-row { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-top: 1px solid #eee9df; }
+    .gen-thumb { flex: none; width: 76px; height: 43px; border: 1px solid #d3ccbd; background: #e9e5db; overflow: hidden; }
+    .gen-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .gen-thumb .ph2 { display: grid; place-items: center; height: 100%; color: #a49c8e; font-size: 9px; }
+    .gen-main { flex: 1; min-width: 0; }
+    .gen-main b { display: block; font-size: 12px; }
+    .gen-main span { color: #a49c8e; font: 400 9px/1.5 "IBM Plex Mono", Menlo, monospace; }
+    .gen-row .pill.sm { flex: none; }
+    .asset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; margin-top: 14px; }
+    .asset-card { border: 1px solid #ddd7cb; background: #faf9f5; padding: 10px; }
+    .asset-card .g-thumb { display: block; margin-bottom: 8px; }
+    .asset-kind { color: var(--ac); font: 600 9px/1 "IBM Plex Mono", Menlo, monospace; letter-spacing: .12em; }
+    .asset-card h4 { margin: 4px 0 2px; font-size: 12.5px; font-weight: 700; }
+    .asset-card .rk { color: #a49c8e; font: 400 9px/1.4 "IBM Plex Mono", Menlo, monospace; }
+    .asset-foot { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+    .asset-files { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .asset-files button { padding: 0; border: 2px solid transparent; background: none; cursor: pointer; }
+    .asset-files img { width: 52px; height: 30px; object-fit: cover; display: block; border: 1px solid #d3ccbd; }
+    .asset-files button.primary { border-color: var(--ac); }
+    .asset-expand { border-top: 1px dashed #ddd7cb; margin-top: 9px; padding-top: 9px; }
+    @media (max-width: 1180px) {
+      .collab-shell { padding: 0 28px; }
+      .stage-info { width: 320px; }
+      .gal { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 1024px) {
+      .collab-shell { height: auto; min-height: 100vh; padding-bottom: 60px; }
+      .collab-main { display: block; overflow: visible; }
+      #viewRoot { display: block; }
+      .stage-row { flex-direction: column; gap: 22px; flex: none; }
+      .stage { flex: none; aspect-ratio: 2.39 / 1; min-height: 0; }
+      .stage-info { width: auto; padding-top: 0; order: 2; overflow: visible; }
+      .stage-col { order: 1; width: 100%; }
+      .k-time { font-size: 25px; }
+    }
+    @media (max-width: 920px) {
+      .collab-shell { padding: 0 18px 50px; }
+      .proj-strip { flex-direction: column; align-items: flex-start; gap: 12px; padding: 16px 0 14px; }
+      .ps-side { flex-wrap: wrap; }
+      .studio-crumb { display: none; }
+      .cell { flex: 0 0 132px; }
+    }
+    @media (max-width: 560px) {
+      .collab-shell { padding: 0 14px 50px; }
+      .studio-bar { gap: 12px; }
+      .st-identity { display: none; }
+      .ps-title { font-size: 18px; }
+      .k-time { font-size: 22px; }
+      .gal { grid-template-columns: 1fr; }
+      .scene-add { grid-template-columns: 1fr; }
+      .v-row { flex-wrap: wrap; gap: 8px 12px; }
+      .v-row .st-word { margin-left: 46px; }
+      .sp-scene { grid-template-columns: 1fr; gap: 6px; }
+      .view-tabs { gap: 18px; }
+    }
+    /* ---- 云端版：连接/登录门、提示条、个人资料、文件行 ---- */
+    .gate { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; background: #f3f1ec; padding: 20px; }
+    .gate[hidden] { display: none; }
+    .gate-card { width: min(430px, 100%); box-sizing: border-box; border: 1px solid #d3ccbd; background: #faf9f5; box-shadow: 0 24px 60px rgba(60, 52, 38, .14); padding: 34px 34px 28px; display: flex; flex-direction: column; gap: 13px; }
+    .gate-brand { font-family: "Space Grotesk", "Avenir Next", sans-serif; font-size: 11px; font-weight: 600; letter-spacing: .2em; color: var(--ac); }
+    .gate-card h1 { margin: 0; max-width: none; color: #211e19; font-size: 21px; font-weight: 700; line-height: 1.3; letter-spacing: .01em; }
+    .gate-sub { margin: 0; color: #6e675d; font-size: 11.5px; line-height: 1.85; }
+    .gate-card .st-input { margin: 0; font-size: 13px; padding: 10px 12px; height: auto; }
+    .gate-actions { display: flex; gap: 10px; margin-top: 2px; }
+    .gate-err { margin: 0; color: #a5482f; font-size: 11px; line-height: 1.6; min-height: 17px; }
+    .gate-foot { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-top: 2px; }
+    .bar-user { display: inline-flex; align-items: center; gap: 8px; color: #55503f; font-size: 11px; white-space: nowrap; }
+    .toast { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); z-index: 120; max-width: min(560px, 90vw); background: #211e19; color: #f6f4ef; font-size: 11.5px; line-height: 1.6; padding: 10px 18px; border-radius: 999px; box-shadow: 0 14px 34px rgba(33, 29, 21, .3); }
+    .toast[hidden] { display: none; }
+    .st-avatar.has-img { background: #e9e5db; }
+    .st-avatar img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; }
+    .me-avatar { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .me-av-preview { width: 34px; height: 34px; flex: none; border-radius: 50%; display: inline-grid; place-items: center; overflow: hidden; color: #fff; font-size: 12.5px; font-weight: 700; }
+    .me-av-preview img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .me-avatar .pill { flex: none; height: 30px; padding: 0 13px; font-size: 11px; line-height: 1; display: inline-flex; align-items: center; }
+    .me-avatar .st-linkbtn { flex: none; margin-left: auto; }
+    .me-row { display: grid; grid-template-columns: minmax(0, 1fr) 108px; gap: 8px; }
+    .me-row .st-input { margin-bottom: 0; }
+    .file-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .file-name { flex: 1; min-width: 0; color: #a49c8e; font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ver-dl:hover { color: var(--ac-dark); }
+  </style>
+</head>
+<body class="collab-mode">
+  <section class="collab-shell" aria-label="AI 视频协作工作台 · 云端版">
+    <header class="studio-bar">
+      <button class="st-iconbtn" type="button" id="navToggle" aria-label="打开项目与选题库"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/></svg></button>
+      <span class="studio-brand">ORBIT STUDIO</span>
+      <p class="studio-crumb" id="crumb"></p>
+      <span class="bar-user" id="barUser"></span>
+    </header>
+    <div id="projectHead"></div>
+    <nav class="view-tabs" id="viewTabs" aria-label="项目内容分区"></nav>
+    <main class="collab-main" id="mainCol" aria-live="polite">
+      <section id="viewRoot"></section>
+    </main>
+  </section>
+  <aside class="side-panel" id="sidePanel" aria-label="项目与选题库">
+    <section aria-label="项目">
+      <p class="side-cap">项目 <span id="projCount"></span></p>
+      <div class="proj-rows" id="projectList"></div>
+    </section>
+    <details class="side-fold" aria-label="新建项目" open>
+      <summary>新建项目<span class="fold-hint">42 个主题</span></summary>
+      <div class="fold-body">
+        <input class="st-input" id="newProjectName" type="text" placeholder="项目名称（留空按主题自动命名）" autocomplete="off" />
+        <label class="fold-label" for="topicSelect">选题主题（参考 · 用于预填脚本提示词）</label>
+        <select class="st-input" id="topicSelect" aria-label="选题主题"></select>
+        <button class="pill solid" type="button" id="createProjectBtn">新建项目</button>
+      </div>
+    </details>
+    <details class="side-fold" aria-label="模型库">
+      <summary>模型库<span class="fold-hint" id="modelCount"></span></summary>
+      <div class="fold-body">
+        <div id="modelGroups"></div>
+        <form class="mk-add" id="modelAddForm">
+          <select class="st-input" name="kind" aria-label="模型类型"><option value="text">文本</option><option value="image">图片</option><option value="video">视频</option></select>
+          <input class="st-input" name="name" placeholder="模型名称" autocomplete="off" />
+          <button class="pill sm" type="submit">添加</button>
+        </form>
+        <p class="topic-help">新任务默认用该类型的第一个模型。</p>
+      </div>
+    </details>
+    <div class="side-foot">
+      <p class="side-cap">我的资料</p>
+      <div class="me-avatar">
+        <span class="me-av-preview" id="meAvatarPreview"></span>
+        <input type="file" id="meAvatarFile" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
+        <button class="pill sm" type="button" id="meAvatarBtn">上传头像</button>
+        <button class="st-linkbtn" type="button" id="meAvatarClear" hidden>移除</button>
+      </div>
+      <div class="me-row">
+        <input class="st-input" id="meName" placeholder="显示名" autocomplete="off" />
+        <select class="st-input" id="meRole" aria-label="我的分工"><option value="script">脚本 / 统筹</option><option value="visual">图像生成</option><option value="video">视频生成</option></select>
+      </div>
+      <p class="crew-lines" id="crewLines"></p>
+      <button class="st-linkbtn" type="button" id="logoutBtn">退出登录</button>
+    </div>
+  </aside>
+  <aside class="inspector-panel" id="inspector" aria-label="内容详情"></aside>
+  <div class="st-scrim" id="stScrim" hidden></div>
+  <div class="gate" id="gate"><div class="gate-card" id="gateCard"></div></div>
+  <div class="toast" id="toast" hidden></div>
+
+  <!-- supabase-js 由本项目自行托管，不依赖任何外部 CDN（部分网络访问不到公共 CDN 会导致整站不可用） -->
+  <script src="./supabase.min.js?v=2"></script>
+  <script>
+    const categories = [
+      ['宇宙 / 天文学', '宇宙起源、大爆炸、宇宙终结、宇宙边界、宇宙之外、宇宙维度、多维空间、平行宇宙、多重宇宙、时间本质、时间旅行、时间悖论、黑洞、白洞、虫洞、暗物质、暗能量、反物质、超新星、恒星死亡、中子星、银河系、太阳系、太阳、月球、火星、金星、木星、地球特殊性、系外行星、流浪行星、宇宙信号、快速射电暴、宇宙大过滤器、费米悖论、黑暗森林、宇宙文明等级、戴森球、宇宙模拟论、宇宙全息理论、观察者效应、宇宙是否有意识'],
+      ['外星文明 / UFO', '外星人、UFO、UAP、美国军方 UFO、罗斯威尔事件、51区、外星人绑架、第三类接触、外星文明信号、外星遗迹、火星文明、月球文明、月球异常现象、古代外星人、灰人、蜥蜴人、尼比鲁、麦田怪圈、动物肢解事件、飞碟目击、外星科技、外星文明等级、外星生命形态、人类是否由外星文明创造、外星文明监视地球、外星文明为什么不联系我们、仁顷接触事件、接触事件'],
+      ['量子 / 前沿物理', '双缝干涉、量子力学、量子纠缠、量子叠加、观察者效应、薛定谔的猫、量子意识、量子计算、量子世界、粒子与波、时间与量子、平行宇宙解释、现实是否由观察产生、物质本质、信息是否构成宇宙、超导、常温超导'],
+      ['人类起源 / 进化', '达尔文、进化论、人类进化、智人、尼安德特人、丹尼索瓦人、人类祖先、失落的人类分支、人类为什么突然出现文明、人类大脑进化、人类语言起源、直立行走、人类独有特征、DNA、人类基因异常、人类寿命、永生、病毒与进化'],
+      ['生命 / 生物学', '生命起源、DNA、基因、病毒、细菌、寄生虫、水熊虫、不死生物、动物智力、动物特殊能力、深海生物、史前动物、巨型生物、濒危动物、奇特生物、植物意识、菌类、生态系统、生命极限、人体极限、衰老、永生、生物复制、镜像生命、可能毁灭一切的镜像生命'],
+      ['大脑 / 意识', '意识是什么、自我意识、潜意识、集体潜意识、大脑骗局、记忆、错误记忆、曼德拉效应、人格、多重人格、人格分裂、催眠、梦、清醒梦、预知梦、睡眠、濒死体验、灵魂出窍、第三只眼、松果体、直觉、第六感、天才、智商、人类认知极限、意识上传、意识是否独立于肉体'],
+      ['心理学 / 人性', '荣格、弗洛伊德、人格类型、性格分析、心理测试、潜意识测试、人格测试、血型性格、群体心理、从众效应、服从实验、权威效应、认知偏差、记忆偏差、心理操纵、恐惧、孤独、幸福、爱情、死亡恐惧、人格形成、童年影响、人性善恶'],
+      ['哲学 / 人生', '老子、道德经、庄子、东方哲学、西方哲学、人生意义、自由意志、命运、宿命论、因果、巧合、同步性、现实与幻觉、我是谁、人为什么活着、死亡是什么、幸福是什么、时间与人生、选择、意识与存在'],
+      ['超自然 / 灵异', '鬼、灵魂、轮回、前世、转世记忆、濒死体验、通灵、预知未来、灵魂出窍、附身、恶魔、诅咒、超能力、念力、读心术、透视、遥视、第六感、开天眼、神秘照片、灵异录像、灵异地点、闹鬼事件、无法解释的失踪'],
+      ['神秘学 / 秘术', '占星术、塔罗、数字神秘学、炼金术、魔法、巫术、神秘符号、第三只眼、松果体、阿卡西记录、集体意识、吸引力法则、显化、神秘仪式、秘密知识、古代秘术'],
+      ['预言', '诺查丹玛斯、巴巴万加、玛雅预言、世界末日预言、未来人预言、时间旅行者预言、梦境预言、疫情预言、战争预言、经济危机预言、自然灾害预言、人工智能预言、人类灭绝预言、2045奇点、未来年份预测、2020预言、2026相关预测、2030冰河期'],
+      ['世界末日 / 人类灭绝', '核战争、小行星撞击、超级火山、太阳风暴、伽马射线暴、超新星、气候灾难、冰河期、全球变暖、病毒、超级细菌、AI失控、机器人、资源枯竭、石油危机、生态崩溃、粮食危机、人口问题、外星文明攻击、宇宙灾难'],
+      ['古文明', '古埃及、金字塔、狮身人面像、苏美尔、巴比伦、亚述、玛雅、阿兹特克、印加、印度河文明、古印度、中国上古文明、三星堆、亚特兰蒂斯、姆大陆、利莫里亚、史前文明、失落文明'],
+      ['考古谜团 / OOPArts', '金字塔建造技术、巨石阵、复活节岛石像、纳斯卡线、古代巨石建筑、地下遗迹、古代高科技、史前工具、古地图、神秘文物、伏尼契手稿、无法解释的考古发现、史前核战争假说、文明循环论'],
+      ['金字塔专题', '埃及金字塔、吉萨金字塔、胡夫金字塔、金字塔内部结构、隐藏空间、地下结构、建造方法、用途之谜、全球金字塔、中国金字塔、南极金字塔、波斯尼亚金字塔'],
+      ['神话', '中国神话、日本神话、希腊神话、北欧神话、埃及神话、印度神话、苏美尔神话、创世神话、洪水神话、巨人传说、龙、凤凰、恶魔、天使、诸神战争、神是否是外星人'],
+      ['圣经 / 宗教谜团', '创世纪、亚当夏娃、诺亚方舟、大洪水、摩西、耶稣、启示录、天使、堕落天使、恶魔、撒旦、天堂、地狱、守望者、巨人族、末日审判、宗教预言、失落经文'],
+      ['中国传统文化 / 东方神秘', '老子、道德经、庄子、易经、阴阳、五行、风水、八卦、修仙、气、经络、神仙、中国神话、上古传说、山海经、龙、昆仑山、蓬莱、长生不老'],
+      ['历史谜案', '历史人物死亡谜团、消失的人、失踪军队、失踪船只、失踪飞机、未解谋杀、身份之谜、王室谜团、战争谜团、历史悬案、档案解密、被隐藏的历史'],
+      ['神秘人物 / 奇人', '尼古拉·特斯拉、爱因斯坦、达芬奇、牛顿、达尔文、奥本海默、荣格、预言家、天才、超能力者、记忆大师、数学天才、隐士、神秘富豪、探险家、航海家'],
+      ['阴谋论 / 秘密组织', '共济会、光明会、秘密政府、影子政府、精英集团、新世界秩序、神秘组织、地下基地、51区、秘密实验、政府隐瞒 UFO、被封锁的科技、人口控制、社会控制、媒体操纵、全球监控'],
+      ['神秘地点', '百慕大三角、南极、北极、51区、死亡谷、百慕大、神秘岛屿、无人区、海底、地下世界、洞穴、森林、沙漠、失踪区域、禁区、军事基地'],
+      ['海洋 / 深海', '深海世界、马里亚纳海沟、深海怪物、巨型生物、未知物种、海底文明、海底遗迹、海底火山、深海压力、深海探测、神秘声音、幽灵船、海洋未解事件'],
+      ['地球科学 / 自然奇观', '地球内部、地核、地幔、板块运动、地震、火山、超级火山、磁场、磁极反转、南极、北极、冰川、海洋、洞穴、极端天气、自然灾害、地球历史、冰河期'],
+      ['灾难 / 生存', '地震、海啸、火山、洪水、陨石、森林火灾、核事故、飞机事故、船难、极端环境、生存故事、荒野求生、人类极限、灾难幸存者'],
+      ['科技 / 未来', 'AI、AGI、超级人工智能、机器人、自动化、无人驾驶、脑机接口、意识上传、虚拟现实、元宇宙、量子计算、基因编辑、克隆、器官再生、永生技术、太空移民、火星殖民、未来城市、未来职业、未来社会'],
+      ['AI专题', 'AI是否产生意识、AI取代人类、AI失控、AI创造AI、机器人繁殖、AGI、超级智能、人机融合、AI预测未来、AI改变职业、AI导致人类灭绝'],
+      ['未来人类', '2045奇点、永生、数字生命、赛博格、人机融合、基因强化、超级人类、意识上传、虚拟世界生活、火星人类、太空文明、人类是否会成为神'],
+      ['社会 / 未来职业', '消失的职业、自动化、贫富差距、人口变化、老龄化、教育、工作制度、未来就业、经济危机、金融危机、社会结构变化'],
+      ['金融 / 经济', '金融危机、货币、通货膨胀、经济泡沫、财富、富人思维、贫富差距、石油、资源、黄金、全球经济风险、可怕的石油'],
+      ['犯罪 / 悬案', '完美犯罪、连环杀手、神秘谋杀、失踪案、绑架案、密室案件、身份谜案、警方调查、几十年未破案件、大规模嫌疑人案件、犯罪心理'],
+      ['实验 / 真实事件', '斯坦福监狱实验、米尔格拉姆实验、心理实验、社会实验、封闭生态实验、人体实验、睡眠实验、记忆实验、孤立实验、生存实验、史上最大规模的封闭实验、第二个大自然'],
+      ['数学 / 逻辑 / 悖论', '无限、概率、巧合概率、生日悖论、时间悖论、祖父悖论、费米悖论、数学谜题、逻辑谜题、不可解问题、随机性、数字规律'],
+      ['信息 / 模拟世界', '缸中之脑、模拟宇宙、矩阵世界、现实是否真实、信息宇宙、NPC理论、意识创造现实、虚拟世界、祖先模拟、宇宙程序'],
+      ['时间', '时间是什么、时间是否存在、时间箭头、过去现在未来、时间旅行、回到过去、前往未来、时间停止、时间膨胀、时间悖论、时间循环、未来人'],
+      ['死亡 / 死后世界', '死亡瞬间、大脑死亡、濒死体验、死后意识、天堂、地狱、轮回、转世、前世记忆、灵魂、死亡之后去了哪里、永生'],
+      ['梦', '梦的形成、梦境含义、清醒梦、预知梦、共同梦境、梦中时间、梦与潜意识、梦与现实、梦境控制、梦是否进入另一个世界'],
+      ['超能力', '读心、预知、遥视、念力、透视、超强记忆、超强计算、人体极限、第六感、松果体、开天眼'],
+      ['奇人奇事 / 世界奇闻', '天才儿童、前世儿童、超长寿者、特殊身体能力、记忆奇人、极端幸存者、神秘失踪者、身份不明者、无法解释的真实案例'],
+      ['动物', '猫、狗、鲸、鲨鱼、章鱼、乌鸦、海豚、昆虫、寄生虫、水熊虫、史前动物、深海动物、动物智商、动物语言、动物第六感、动物异常行为'],
+      ['地理 / 极地 / 探险', '南极、北极、珠峰、洞穴、海沟、沙漠、无人岛、禁区、地下洞穴、极地探险、深海探险、航海'],
+      ['文学 / 故事解读', '三体、奥德赛、神话史诗、科幻作品、哲学故事、历史故事、经典文学背后的世界观']
+    ].map(([name, tags], index) => ({ id: index + 1, name, tags: tags.split('、'), labels: [] }));
+    const labelMap = {
+      '宇宙 / 天文学': ['硬科普', '宏大叙事', '视觉奇观', '思辨烧脑', '系列潜力'],
+      '外星文明 / UFO': ['未解之谜', '档案故事', '争议话题', '悬念向', '需谨慎表述'],
+      '量子 / 前沿物理': ['硬科普', '前沿科技', '思辨烧脑', '概念拆解', '系列潜力'],
+      '人类起源 / 进化': ['科学考据', '文明演进', '身份认同', '长线叙事', '颠覆认知'],
+      '生命 / 生物学': ['硬科普', '奇特生命', '风险议题', '视觉奇观', '颠覆认知'],
+      '大脑 / 意识': ['自我探索', '思辨烧脑', '心理科普', '强代入感', '争议话题'],
+      '心理学 / 人性': ['心理科普', '自我探索', '情绪共鸣', '实验故事', '实用洞见'],
+      '哲学 / 人生': ['思辨烧脑', '自我探索', '情绪共鸣', '经典解读', '长尾内容'],
+      '超自然 / 灵异': ['未解之谜', '惊悚悬念', '真实案例', '民俗信仰', '需谨慎表述'],
+      '神秘学 / 秘术': ['神秘学', '民俗信仰', '仪式感', '争议话题', '需谨慎表述'],
+      '预言': ['未来焦虑', '热点延展', '争议话题', '时间节点', '需谨慎表述'],
+      '世界末日 / 人类灭绝': ['末日焦虑', '风险议题', '宏大叙事', '硬科普', '高冲突'],
+      '古文明': ['历史考据', '失落文明', '视觉奇观', '长线叙事', '争议话题'],
+      '考古谜团 / OOPArts': ['历史考据', '未解之谜', '证据推理', '视觉奇观', '需谨慎表述'],
+      '金字塔专题': ['历史考据', '地标专题', '视觉奇观', '未解之谜', '系列潜力'],
+      '神话': ['神话故事', '跨文化', '人物叙事', '视觉奇观', '经典解读'],
+      '圣经 / 宗教谜团': ['宗教文化', '经典解读', '历史考据', '末日叙事', '需谨慎表述'],
+      '中国传统文化 / 东方神秘': ['传统文化', '东方哲思', '民俗信仰', '经典解读', '长尾内容'],
+      '历史谜案': ['档案故事', '真实悬案', '人物叙事', '证据推理', '高完播'],
+      '神秘人物 / 奇人': ['人物叙事', '天才传奇', '传记故事', '颠覆认知', '长线叙事'],
+      '阴谋论 / 秘密组织': ['争议话题', '档案故事', '社会观察', '未解之谜', '需谨慎表述'],
+      '神秘地点': ['地理奇观', '实地探访', '未解之谜', '视觉奇观', '冒险感'],
+      '海洋 / 深海': ['硬科普', '未知世界', '视觉奇观', '探险故事', '惊悚悬念'],
+      '地球科学 / 自然奇观': ['硬科普', '地理奇观', '灾害机制', '视觉奇观', '系列潜力'],
+      '灾难 / 生存': ['灾害机制', '生存实用', '真实案例', '紧张叙事', '风险议题'],
+      '科技 / 未来': ['前沿科技', '未来想象', '社会变革', '硬科普', '热点延展'],
+      'AI专题': ['前沿科技', '未来焦虑', '争议话题', '社会变革', '热点延展'],
+      '未来人类': ['未来想象', '身份认同', '前沿科技', '思辨烧脑', '宏大叙事'],
+      '社会 / 未来职业': ['社会观察', '职业焦虑', '实用洞见', '热点延展', '长期趋势'],
+      '金融 / 经济': ['经济解释', '风险议题', '社会观察', '热点延展', '实用洞见'],
+      '犯罪 / 悬案': ['真实悬案', '证据推理', '犯罪心理', '高完播', '紧张叙事'],
+      '实验 / 真实事件': ['真实实验', '人性观察', '档案故事', '颠覆认知', '硬科普'],
+      '数学 / 逻辑 / 悖论': ['思辨烧脑', '概念拆解', '互动感', '硬科普', '反常识'],
+      '信息 / 模拟世界': ['思辨烧脑', '科幻感', '现实质疑', '概念拆解', '争议话题'],
+      '时间': ['思辨烧脑', '硬科普', '科幻感', '哲学命题', '系列潜力'],
+      '死亡 / 死后世界': ['自我探索', '情绪共鸣', '医学边界', '民俗信仰', '需谨慎表述'],
+      '梦': ['自我探索', '心理科普', '强代入感', '睡眠议题', '需谨慎表述'],
+      '超能力': ['人体潜能', '自我探索', '争议话题', '真实案例', '需谨慎表述'],
+      '奇人奇事 / 世界奇闻': ['真实奇闻', '人物叙事', '强反差', '情绪共鸣', '高点击'],
+      '动物': ['动物科普', '奇特生命', '治愈感', '视觉奇观', '反常识'],
+      '地理 / 极地 / 探险': ['地理奇观', '探险故事', '实地探访', '视觉奇观', '未知世界'],
+      '文学 / 故事解读': ['经典解读', '世界观', '故事叙事', '哲学命题', 'IP延展']
+    };
+    categories.forEach(category => { category.labels = labelMap[category.name] ?? []; });
+  </script>
+  <script>
+    (() => {
+      'use strict';
+      /* =====================================================================
+         云端版数据层：Supabase（登录 / 云数据库 / 文件存储 / 实时同步）
+         表结构见 supabase-schema.sql。本文件不含本地演示数据。
+         ===================================================================== */
+      const CONFIG_KEY = 'orbitCloudConfig_v1';
+      // 当前团队的公开浏览器连接配置。Publishable key 受 RLS 限制，可安全用于前端。
+      const DEFAULT_CLOUD_CONFIG = Object.freeze({
+        url: 'https://htuhurugbgiperiftigc.supabase.co',
+        anonKey: 'sb_publishable_Lzq5IZsgKuJIcG82ISCxmQ_Leusi7B5'
+      });
+      const STATUS = {
+        todo:   { label: '待开始', cls: 's-todo' },
+        doing:  { label: '制作中', cls: 's-doing' },
+        review: { label: '待确认', cls: 's-review' },
+        done:   { label: '已完成', cls: 's-done' }
+      };
+      const TYPE_LABEL = { script: '剧本文案', image: '画面素材', video: '视频片段', copy: '发布文案', concept: '内容概要' };
+      const ROLE_LABEL = { script: '脚本 / 统筹', visual: '图像生成', video: '视频生成' };
+      const SHORT_ROLE = { script: '统筹', visual: '图像', video: '视频' };
+      const KIND_OF_TYPE = { script: 'text', copy: 'text', image: 'image', video: 'video', concept: 'text' };
+      const KIND_LABEL = { text: '文本', image: '图片', video: '视频' };
+      const PROJECT_STATUS = ['筹备中', '制作中', '待发布', '已完成'];
+      const AVATAR_COLORS = ['#4d718f', '#8a6a49', '#5e7c70', '#7d5a86', '#3d7a8a', '#a2694d'];
+
+      const esc = v => String(v ?? '').replace(/[&<>'"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c]));
+      const now = () => new Date().toISOString();
+      const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+      function fmtAbs(iso) {
+        const d = new Date(iso);
+        return `${d.getMonth() + 1}月${d.getDate()}日 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+      }
+      function fmtRel(iso) {
+        const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+        if (s < 60) return '刚刚';
+        if (s < 3600) return `${Math.floor(s / 60)} 分钟前`;
+        if (s < 86400) return `${Math.floor(s / 3600)} 小时前`;
+        if (s < 86400 * 45) return `${Math.floor(s / 86400)} 天前`;
+        return fmtAbs(iso);
+      }
+      const trunc = (t, n) => { t = String(t ?? ''); return t.length > n ? `${t.slice(0, n)}…` : t; };
+      const isVideoFile = src => /\.(mp4|webm|mov|m4v)(\?.*)?$/i.test((src || '').split('?')[0]) || /\.(mp4|webm|mov|m4v)/i.test((src || '').split('?')[0]);
+
+      /* ---------- 运行时状态 ---------- */
+      let sb = null;
+      let db = { currentUserId: null, users: [], models: [], projects: [] };
+      const state = { projectId: null, tab: 'scenes', sceneId: null, sel: null, selVersion: null, stageKind: 'image', editPrompt: false, drafts: {}, busy: {}, assetOpen: null };
+
+      const el = id => document.getElementById(id);
+      const crumb = el('crumb'), barUser = el('barUser');
+      const projectList = el('projectList'), projCount = el('projCount'), crewLines = el('crewLines');
+      const topicSelect = el('topicSelect'), newProjectName = el('newProjectName');
+      const projectHead = el('projectHead'), viewTabs = el('viewTabs'), viewRoot = el('viewRoot');
+      const inspector = el('inspector'), scrim = el('stScrim'), modelGroups = el('modelGroups');
+      const gate = el('gate'), gateCard = el('gateCard'), toastEl = el('toast');
+
+      let toastTimer = null;
+      function toast(msg) {
+        toastEl.textContent = msg;
+        toastEl.hidden = false;
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => { toastEl.hidden = true; }, 4200);
+      }
+
+      /* ---------- 连接 / 登录门 ---------- */
+      function getConfig() { try { return JSON.parse(localStorage.getItem(CONFIG_KEY) || 'null') || DEFAULT_CLOUD_CONFIG; } catch (e) { return DEFAULT_CLOUD_CONFIG; } }
+      function saveConfig(cfg) { try { localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg)); } catch (e) {} }
+      function initClient() {
+        const cfg = getConfig();
+        if (!cfg || !window.supabase) return false;
+        sb = window.supabase.createClient(cfg.url, cfg.anonKey);
+        return true;
+      }
+      function renderGate(mode, msg) {
+        gate.hidden = false;
+        if (mode === 'loading') {
+          gateCard.innerHTML = '<span class="gate-brand">ORBIT STUDIO</span><h1>正在进入工作台…</h1><p class="gate-sub">读取项目、成员与素材。</p>';
+          return;
+        }
+        if (mode === 'setup') {
+          gateCard.innerHTML = `
+            <span class="gate-brand">ORBIT STUDIO</span>
+            <h1>连接你们的服务器</h1>
+            <p class="gate-sub">在 Supabase 控制台 Settings → API 找到这两个值，粘贴进来（只需一次，之后每台电脑记住各自的配置）。建库时记得先在 SQL Editor 里执行 supabase-schema.sql。</p>
+            <input class="st-input" id="cfgUrl" placeholder="Project URL，如 https://xxxx.supabase.co" autocomplete="off" />
+            <input class="st-input" id="cfgKey" placeholder="anon public key（很长的一串）" autocomplete="off" />
+            <p class="gate-err" id="gateErr">${esc(msg || '')}</p>
+            <div class="gate-actions"><button class="pill solid" type="button" id="cfgSaveBtn">保存并连接</button></div>`;
+          el('cfgSaveBtn').addEventListener('click', () => {
+            const url = el('cfgUrl').value.trim().replace(/\/+$/, '');
+            const key = el('cfgKey').value.trim();
+            if (!/^https:\/\/.+\.supabase\.co$/.test(url)) { el('gateErr').textContent = 'Project URL 看起来不对，应形如 https://xxxx.supabase.co'; return; }
+            if (key.length < 40) { el('gateErr').textContent = 'anon key 看起来不完整，请重新复制'; return; }
+            saveConfig({ url, anonKey: key });
+            if (initClient()) renderGate('login');
+          });
+          return;
+        }
+        // login
+        gateCard.innerHTML = `
+          <span class="gate-brand">ORBIT STUDIO</span>
+          <h1>登录</h1>
+          <p class="gate-sub">用团队约定的邮箱登录；第一次使用点「注册新账号」。</p>
+          <input class="st-input" id="authEmail" type="email" placeholder="邮箱" autocomplete="email" />
+          <input class="st-input" id="authPass" type="password" placeholder="密码（至少 6 位）" autocomplete="current-password" />
+          <p class="gate-err" id="gateErr">${esc(msg || '')}</p>
+          <div class="gate-actions">
+            <button class="pill solid" type="button" id="loginBtn">登录</button>
+            <button class="pill" type="button" id="signupBtn">注册新账号</button>
+          </div>
+`;
+        const err = t => { el('gateErr').textContent = t; };
+        const creds = () => ({ email: el('authEmail').value.trim(), password: el('authPass').value });
+        el('loginBtn').addEventListener('click', async () => {
+          const c = creds();
+          if (!c.email || !c.password) { err('请填写邮箱和密码'); return; }
+          el('loginBtn').textContent = '登录中…';
+          const { data, error } = await sb.auth.signInWithPassword(c);
+          el('loginBtn').textContent = '登录';
+          if (error) { err('登录失败：' + error.message); return; }
+          renderGate('loading');
+          boot(data.session);
+        });
+        el('signupBtn').addEventListener('click', async () => {
+          const c = creds();
+          if (!c.email || c.password.length < 6) { err('请填写邮箱和至少 6 位密码'); return; }
+          el('signupBtn').textContent = '注册中…';
+          const { data, error } = await sb.auth.signUp(c);
+          el('signupBtn').textContent = '注册新账号';
+          if (error) { err('注册失败：' + error.message); return; }
+          if (data.session) { renderGate('loading'); boot(data.session); }
+          else err('账号已创建，请直接点「登录」。');
+        });
+        const cfgResetBtn = el('cfgResetBtn');
+        if (cfgResetBtn) cfgResetBtn.addEventListener('click', () => { localStorage.removeItem(CONFIG_KEY); renderGate('setup'); });
+        el('authPass').addEventListener('keydown', e => { if (e.key === 'Enter') el('loginBtn').click(); });
+      }
+
+      /* ---------- 云端读取 ---------- */
+      async function loadAll() {
+        const q = [
+          sb.from('profiles').select('*'),
+          sb.from('models').select('*').order('created_at'),
+          sb.from('projects').select('*').order('created_at'),
+          sb.from('project_members').select('*'),
+          sb.from('scenes').select('*').order('position'),
+          sb.from('items').select('*').order('created_at'),
+          sb.from('item_versions').select('*').order('v'),
+          sb.from('comments').select('*').order('created_at'),
+          sb.from('assets').select('*').order('created_at'),
+          sb.from('asset_files').select('*').order('created_at'),
+          sb.from('scene_assets').select('*'),
+          sb.from('jobs').select('*').order('created_at', { ascending: false }).limit(120)
+        ];
+        const [pr, mo, pj, pm, sc, it, vs, cm, ass, af, sa, jb] = await Promise.all(q);
+        const bad = [pr, mo, pj, pm, sc, it, vs, cm, ass, af, sa, jb].find(r => r.error);
+        if (bad) { toast('读取失败：' + bad.error.message + '（是否已执行全部数据库脚本？）'); return false; }
+        const avatarPaths = pr.data.filter(u => u.avatar_path).map(u => u.avatar_path);
+        const storagePath = f => f && !/^https?:/.test(f);
+        const paths = [...new Set([
+          ...vs.data.filter(v => storagePath(v.file_path)).map(v => v.file_path),
+          ...af.data.filter(f => storagePath(f.file_path)).map(f => f.file_path),
+          ...avatarPaths
+        ])];
+        const urlMap = {};
+        if (paths.length) {
+          const { data: signed, error: se } = await sb.storage.from('assets').createSignedUrls(paths, 28800);
+          if (se) toast('素材链接读取失败：' + se.message);
+          if (signed) signed.forEach(s => {
+            const path = s.path || s.name;
+            const signedUrl = s.signedUrl || s.signedURL || s.signed_url;
+            if (path && signedUrl) urlMap[path] = signedUrl;
+          });
+        }
+        const resolveSrc = f => !f ? undefined : (/^https?:/.test(f) ? f : urlMap[f]);
+        db.users = pr.data.map(u => ({ id: u.id, name: u.name, short: u.short || (u.name || '?').slice(0, 1), color: u.color || '#4d718f', role: u.role || 'script', avatarPath: u.avatar_path || null, avatarUrl: u.avatar_path ? (urlMap[u.avatar_path] || null) : null }));
+        db.models = mo.data.map(m => ({ id: m.id, kind: m.kind, name: m.name }));
+        const versByItem = {};
+        vs.data.forEach(v => {
+          (versByItem[v.item_id] = versByItem[v.item_id] || []).push({
+            id: v.id, v: v.v, at: v.created_at, by: v.created_by, note: v.note,
+            body: v.body || undefined, filePath: v.file_path || undefined,
+            src: resolveSrc(v.file_path),
+            prompt: v.prompt_snapshot || '', model: v.model_snapshot || ''
+          });
+        });
+        const cmByItem = {};
+        cm.data.forEach(c => { (cmByItem[c.item_id] = cmByItem[c.item_id] || []).push({ id: c.id, by: c.author_id, at: c.created_at, text: c.text, sys: c.is_system }); });
+        const saByScene = {};
+        sa.data.forEach(x => { (saByScene[x.scene_id] = saByScene[x.scene_id] || []).push(x.asset_id); });
+        const scByProj = {};
+        sc.data.forEach(s => { (scByProj[s.project_id] = scByProj[s.project_id] || []).push({ id: s.id, time: s.time_code, title: s.title, action: s.action, visual: s.visual, sound: s.sound, edit: s.edit, imagePrompt: s.image_prompt || '', videoPrompt: s.video_prompt || '', assetIds: saByScene[s.id] || [] }); });
+        const filesByAsset = {};
+        af.data.forEach(f => {
+          (filesByAsset[f.asset_id] = filesByAsset[f.asset_id] || []).push({
+            id: f.id, path: f.file_path, label: f.label || '', promptSnap: f.prompt_snapshot || '',
+            modelSnap: f.model_snapshot || '', by: f.created_by, at: f.created_at, src: resolveSrc(f.file_path) || null
+          });
+        });
+        const assetsByProj = {};
+        ass.data.forEach(a => {
+          const files = filesByAsset[a.id] || [];
+          const primary = files.find(f => f.id === a.primary_file_id) || files[files.length - 1] || null;
+          (assetsByProj[a.project_id] = assetsByProj[a.project_id] || []).push({
+            id: a.id, kind: a.kind, refKey: a.ref_key, name: a.name, descr: a.descr || '',
+            prompt: a.prompt || '', modelName: a.model_name || '', status: a.status || 'todo',
+            ownerId: a.owner_id, primaryFileId: primary ? primary.id : null, files,
+            primarySrc: primary ? primary.src : null
+          });
+        });
+        const jobsByProj = {};
+        jb.data.forEach(j => { (jobsByProj[j.project_id] = jobsByProj[j.project_id] || []).push({ id: j.id, kind: j.kind, status: j.status, model: j.model || '', error: j.error || '', externalId: j.external_id || null, targetId: j.target_id, at: j.created_at }); });
+        const itByProj = {};
+        it.data.forEach(i => {
+          const versions = versByItem[i.id] || [];
+          const withSrc = versions.filter(v => v.src);
+          (itByProj[i.project_id] = itByProj[i.project_id] || []).push({
+            id: i.id, type: i.type, sceneId: i.scene_id, title: i.title, desc: i.descr,
+            status: i.status, ownerId: i.owner_id, prompt: i.prompt,
+            model: { name: i.model_name, mode: i.model_mode, refs: i.model_refs },
+            versions, comments: cmByItem[i.id] || [],
+            asset: withSrc.length ? { src: withSrc[withSrc.length - 1].src, label: i.title } : null,
+            createdAt: i.created_at, updatedAt: i.updated_at
+          });
+        });
+        const memByProj = {};
+        pm.data.forEach(m => { (memByProj[m.project_id] = memByProj[m.project_id] || []).push({ userId: m.user_id, role: m.role }); });
+        db.projects = pj.data.map(p => ({
+          id: p.id, topicId: p.topic_id, title: p.title, meta: p.meta, status: p.status,
+          stage: p.stage || 'topic', topicText: p.topic_text || '', brief: p.brief || '',
+          createdAt: p.created_at, updatedAt: p.updated_at,
+          members: memByProj[p.id] || [], scenes: scByProj[p.id] || [], items: itByProj[p.id] || [],
+          assets: assetsByProj[p.id] || [], jobs: jobsByProj[p.id] || [], sources: []
+        }));
+        return true;
+      }
+      /* ---------- 实时同步 ---------- */
+      let reloadTimer = null;
+      let liveChannel = null;
+      function scheduleReload() {
+        clearTimeout(reloadTimer);
+        reloadTimer = setTimeout(async () => {
+          const ae = document.activeElement;
+          if (ae && (ae.tagName === 'TEXTAREA' || (ae.tagName === 'INPUT' && ae.type !== 'file'))) { scheduleReload(); return; }
+          if (await loadAll()) renderAllPreserve();
+        }, 700);
+      }
+      function subscribeRealtime() {
+        if (liveChannel) sb.removeChannel(liveChannel);
+        liveChannel = sb.channel('orbit-live')
+          .on('postgres_changes', { event: '*', schema: 'public' }, scheduleReload)
+          .subscribe();
+      }
+      function renderAllPreserve() {
+        if (!db.projects.some(p => p.id === state.projectId)) {
+          state.projectId = db.projects.length ? db.projects[0].id : null;
+          state.sceneId = null; state.sel = null; state.selVersion = null;
+        }
+        const p = getProject();
+        if (p && state.sceneId && !p.scenes.some(s => s.id === state.sceneId)) state.sceneId = p.scenes.length ? p.scenes[0].id : null;
+        if (p && state.sel && !p.items.some(i => i.id === state.sel)) { state.sel = null; state.selVersion = null; }
+        if (p && state.assetOpen && !p.assets.some(a => a.id === state.assetOpen)) state.assetOpen = null;
+        renderAll();
+      }
+
+      /* ---------- 启动 ---------- */
+      async function boot(session) {
+        db.currentUserId = session.user.id;
+        const { data: prof, error: profileError } = await sb.from('profiles').select('id').eq('id', session.user.id).maybeSingle();
+        if (profileError) {
+          renderGate('login', '成员档案读取失败：' + profileError.message);
+          return;
+        }
+        if (!prof) {
+          const name = (session.user.email || '成员').split('@')[0];
+          const profileWrite = await cw(sb.from('profiles').insert({
+            id: session.user.id, name, short: name.slice(0, 1).toUpperCase(),
+            color: AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)]
+          }), '创建成员档案');
+          if (!profileWrite.ok) {
+            renderGate('login', '成员档案创建失败，请确认已执行数据库脚本后重试。');
+            return;
+          }
+        }
+        if (!(await loadAll())) { renderGate('login', '数据读取失败，请确认已在 SQL Editor 执行 supabase-schema.sql'); return; }
+        state.projectId = db.projects.length ? db.projects[0].id : null;
+        const p = getProject();
+        if (p && p.scenes.length) state.sceneId = p.scenes[0].id;
+        gate.hidden = true;
+        renderAll();
+        subscribeRealtime();
+      }
+
+      /* ---------- 查询助手 ---------- */
+      const getProject = () => db.projects.find(p => p.id === state.projectId) || null;
+      const userById = id => db.users.find(u => u.id === id) || { id, name: '成员', short: '?', color: '#a49c8e', role: 'script' };
+      const curUser = () => userById(db.currentUserId);
+      const topicById = id => categories.find(c => c.id === id);
+      const itemById = (p, id) => p.items.find(i => i.id === id);
+      const sceneById = (p, id) => p.scenes.find(s => s.id === id);
+      const sceneNo = (p, id) => { const i = p.scenes.findIndex(s => s.id === id); return i < 0 ? null : i + 1; };
+      const sceneItem = (p, type, sceneId) => p.items.find(i => i.type === type && i.sceneId === sceneId);
+      const roleUser = (p, role) => { const m = (p.members || []).find(x => x.role === role); return m ? userById(m.userId) : curUser(); };
+      const itemsOf = (p, type) => p.items.filter(i => i.type === type);
+      const doneRatio = p => ({ done: p.items.filter(i => i.status === 'done').length, total: p.items.length });
+      const modelsOf = kind => db.models.filter(m => m.kind === kind);
+      const modelFor = kind => { const m = modelsOf(kind)[0]; return m ? m.name : '待选择'; };
+      const currentSrc = item => {
+        if (!item) return null;
+        const withSrc = item.versions.filter(v => v.src);
+        return (item.asset && item.asset.src) || (withSrc.length ? withSrc[withSrc.length - 1].src : null);
+      };
+
+      /* ---------- 云端写入（乐观更新：先改本地镜像再写库） ---------- */
+      async function cw(promiseLike, what) {
+        try {
+          const result = await promiseLike;
+          if (result.error) {
+            toast(`${what || '保存'}失败：${result.error.message}`);
+            scheduleReload();
+            return { ok: false, data: result.data };
+          }
+          return { ok: true, data: result.data };
+        } catch (e) {
+          toast(`${what || '保存'}失败：网络异常`);
+          scheduleReload();
+          return { ok: false, data: null };
+        }
+      }
+      function touchLocal(p, item) { const t = now(); if (item) item.updatedAt = t; p.updatedAt = t; }
+      function saveItemMeta(p, item, patch) {
+        touchLocal(p, item);
+        cw(sb.from('items').update(Object.assign({ updated_at: item.updatedAt }, patch || {})).eq('id', item.id), '更新内容');
+        cw(sb.from('projects').update({ updated_at: p.updatedAt }).eq('id', p.id), '更新项目时间');
+      }
+      function sysNote(p, item, text) {
+        const c = { id: uuid(), by: db.currentUserId, at: now(), text, sys: true };
+        item.comments.push(c);
+        cw(sb.from('comments').insert({ id: c.id, item_id: item.id, author_id: c.by, text, is_system: true, created_at: c.at }), '记录');
+      }
+      function setStatus(p, item, status) {
+        if (item.status === status) return;
+        item.status = status;
+        sysNote(p, item, `将状态改为「${STATUS[status].label}」`);
+        saveItemMeta(p, item, { status });
+      }
+      function setOwner(p, item, userId) {
+        if (item.ownerId === userId) return;
+        item.ownerId = userId;
+        sysNote(p, item, `把负责人改为 ${userById(userId).name}`);
+        saveItemMeta(p, item, { owner_id: userId });
+      }
+      function setPrompt(p, item, text) {
+        item.prompt = text;
+        const patch = { prompt: text };
+        if (item.status === 'todo') { item.status = 'doing'; patch.status = 'doing'; }
+        sysNote(p, item, '更新了提示词');
+        saveItemMeta(p, item, patch);
+      }
+      function setModelName(p, item, name) {
+        if (item.model.name === name) return;
+        item.model.name = name;
+        sysNote(p, item, `把模型改为「${name}」`);
+        saveItemMeta(p, item, { model_name: name });
+      }
+      function setModelField(p, item, field, value) {
+        item.model[field] = value;
+        saveItemMeta(p, item, field === 'mode' ? { model_mode: value } : { model_refs: value });
+      }
+      function addComment(p, item, text) {
+        const c = { id: uuid(), by: db.currentUserId, at: now(), text };
+        item.comments.push(c);
+        touchLocal(p, item);
+        cw(sb.from('comments').insert({ id: c.id, item_id: item.id, author_id: c.by, text, created_at: c.at }), '发表评论');
+        cw(sb.from('items').update({ updated_at: item.updatedAt }).eq('id', item.id));
+        cw(sb.from('projects').update({ updated_at: p.updatedAt }).eq('id', p.id));
+      }
+      async function nextVersionNumber(itemId) {
+        const { data, error } = await sb.from('item_versions').select('v').eq('item_id', itemId).order('v', { ascending: false }).limit(1);
+        if (error) {
+          toast('读取版本号失败：' + error.message);
+          return null;
+        }
+        return (data && data.length ? data[0].v : 0) + 1;
+      }
+      const versionModelSnapshot = item => `模型：${item.model.name}\n模式：${item.model.mode}\n参考：${item.model.refs}`;
+      async function addVersion(p, item, note, file) {
+        const v = await nextVersionNumber(item.id);
+        if (!v) return false;
+        const ver = { id: uuid(), v, at: now(), by: db.currentUserId, note: (note || '').trim() || `第 ${v} 次生成`, prompt: item.prompt || '', model: versionModelSnapshot(item) };
+        let filePath = null;
+        if (file) {
+          const safe = file.name.replace(/[^\w.\-一-龥]+/g, '_');
+          filePath = `items/${item.id}/v${v}-${Date.now()}-${safe}`;
+          const { error: upErr } = await sb.storage.from('assets').upload(filePath, file, { contentType: file.type || undefined });
+          if (upErr) { toast('文件上传失败：' + upErr.message); return false; }
+          ver.filePath = filePath;
+        }
+        const versionWrite = await cw(sb.from('item_versions').insert({
+          id: ver.id, item_id: item.id, v, note: ver.note, file_path: filePath,
+          prompt_snapshot: ver.prompt, model_snapshot: ver.model, created_by: ver.by, created_at: ver.at
+        }), '登记版本');
+        if (!versionWrite.ok) {
+          if (filePath) await cw(sb.storage.from('assets').remove([filePath]), '清理未登记文件');
+          return false;
+        }
+        if (filePath) {
+          const { data: signed, error: signError } = await sb.storage.from('assets').createSignedUrl(filePath, 28800);
+          if (signError) toast('版本已登记，但预览链接生成失败：' + signError.message);
+          else ver.src = signed.signedUrl;
+        }
+        item.versions.push(ver);
+        if (ver.src) item.asset = { src: ver.src, label: item.title };
+        const patch = {};
+        if (item.status === 'todo' || item.status === 'doing') { item.status = 'review'; patch.status = 'review'; }
+        sysNote(p, item, `登记生成结果 v${v}${filePath ? '（含文件）' : ''}`);
+        saveItemMeta(p, item, patch);
+        return true;
+      }
+      async function addCopyVersion(p, item, note, body) {
+        const v = await nextVersionNumber(item.id);
+        if (!v) return false;
+        const ver = { id: uuid(), v, at: now(), by: db.currentUserId, note: note || `第 ${v} 版`, body, prompt: item.prompt || '', model: versionModelSnapshot(item) };
+        const versionWrite = await cw(sb.from('item_versions').insert({
+          id: ver.id, item_id: item.id, v, note: ver.note, body,
+          prompt_snapshot: ver.prompt, model_snapshot: ver.model, created_by: ver.by, created_at: ver.at
+        }), '保存文案版本');
+        if (!versionWrite.ok) return false;
+        item.versions.push(ver);
+        const patch = {};
+        if (item.status === 'todo') { item.status = 'doing'; patch.status = 'doing'; }
+        saveItemMeta(p, item, patch);
+        return true;
+      }
+      async function deleteVersion(p, item, vNo) {
+        const ver = item.versions.find(x => x.v === vNo);
+        if (!ver) return false;
+        const versionDelete = await cw(sb.from('item_versions').delete().eq('id', ver.id), '删除版本');
+        if (!versionDelete.ok) return false;
+        if (ver.filePath) await cw(sb.storage.from('assets').remove([ver.filePath]), '删除文件');
+        if (ver.src && item.asset && item.asset.src === ver.src) item.asset = null;
+        item.versions = item.versions.filter(x => x.v !== vNo);
+        const rest = item.versions.filter(x => x.src);
+        if (!item.asset && rest.length) item.asset = { src: rest[rest.length - 1].src, label: item.title };
+        if (state.selVersion === vNo) state.selVersion = null;
+        sysNote(p, item, `删除了版本 v${vNo}`);
+        saveItemMeta(p, item);
+        return true;
+      }
+      async function downloadVersion(ver, title) {
+        if (!ver.filePath) return;
+        const { data, error } = await sb.storage.from('assets').createSignedUrl(ver.filePath, 300, { download: true });
+        if (error || !data) { toast('下载链接生成失败'); return; }
+        const a = document.createElement('a');
+        a.href = data.signedUrl;
+        a.download = '';
+        document.body.appendChild(a); a.click(); a.remove();
+      }
+      async function deleteItem(p, id) {
+        const item = itemById(p, id);
+        if (!item) return false;
+        const files = item.versions.filter(v => v.filePath).map(v => v.filePath);
+        const itemDelete = await cw(sb.from('items').delete().eq('id', id), '删除内容');
+        if (!itemDelete.ok) return false;
+        if (files.length) await cw(sb.storage.from('assets').remove(files), '删除文件');
+        p.items = p.items.filter(i => i.id !== id);
+        if (state.sel === id) { state.sel = null; state.selVersion = null; }
+        touchLocal(p, null);
+        cw(sb.from('projects').update({ updated_at: p.updatedAt }).eq('id', p.id));
+        return true;
+      }
+      async function deleteScene(p, sceneId) {
+        const doomed = p.items.filter(i => i.sceneId === sceneId);
+        const files = doomed.flatMap(i => i.versions.filter(v => v.filePath).map(v => v.filePath));
+        const sceneDelete = await cw(sb.from('scenes').delete().eq('id', sceneId), '删除场景');
+        if (!sceneDelete.ok) return false;
+        if (files.length) await cw(sb.storage.from('assets').remove(files), '删除文件');
+        const removed = new Set(doomed.map(i => i.id));
+        p.scenes = p.scenes.filter(s => s.id !== sceneId);
+        p.items = p.items.filter(i => i.sceneId !== sceneId);
+        if (removed.has(state.sel)) { state.sel = null; state.selVersion = null; }
+        if (state.sceneId === sceneId) state.sceneId = p.scenes.length ? p.scenes[0].id : null;
+        touchLocal(p, null);
+        cw(sb.from('projects').update({ updated_at: p.updatedAt }).eq('id', p.id));
+        return true;
+      }
+      function addModel(kind, name) {
+        const m = { id: uuid(), kind, name };
+        db.models.push(m);
+        cw(sb.from('models').insert({ id: m.id, kind, name }), '添加模型');
+      }
+      function deleteModel(id) {
+        db.models = db.models.filter(m => m.id !== id);
+        cw(sb.from('models').delete().eq('id', id), '删除模型');
+      }
+      async function addScene(p, title, time) {
+        const id = uuid();
+        const no = p.scenes.length + 1;
+        const scene = { id, time: time || '', title: title || `场景 ${no}`, action: '', visual: '', sound: '', edit: '' };
+        p.scenes.push(scene);
+        const sceneWrite = await cw(sb.from('scenes').insert({ id, project_id: p.id, position: no, time_code: scene.time, title: scene.title }), '添加场景');
+        if (!sceneWrite.ok) {
+          p.scenes = p.scenes.filter(s => s.id !== id);
+          return null;
+        }
+        const createdItems = await Promise.all([
+          insertTaskItem(p, 'image', id, scene.title),
+          insertTaskItem(p, 'video', id, scene.title)
+        ]);
+        p.items.push(...createdItems.filter(Boolean));
+        touchLocal(p, null);
+        cw(sb.from('projects').update({ updated_at: p.updatedAt }).eq('id', p.id));
+        return id;
+      }
+      function mkTaskItem(p, type, sceneId, sceneTitle) {
+        const scene = sceneById(p, sceneId);
+        const t = now();
+        const base = { id: uuid(), type, sceneId, status: 'todo', asset: null, versions: [], comments: [], createdAt: t, updatedAt: t };
+        if (type === 'image') {
+          return Object.assign(base, {
+            title: `${sceneTitle} · 场景图`, ownerId: roleUser(p, 'visual').id,
+            desc: scene && scene.visual ? scene.visual : '待补充画面描述。',
+            prompt: scene && scene.action ? `${scene.action}\n\n画面限制：延续项目主视觉色调；不出现文字、UI、霓虹特效。` : `场景「${sceneTitle}」的画面素材。`,
+            model: { name: modelFor('image'), mode: '参考图生成', refs: '项目主视觉 / 角色锚点' }
+          });
+        }
+        return Object.assign(base, {
+          title: `${sceneTitle} · 动态镜头`, ownerId: roleUser(p, 'video').id,
+          desc: '基于已确认场景图生成动态镜头。',
+          prompt: `首帧：待生成场景图\n时长：${scene && scene.time ? scene.time : '待定'}\n运镜：${scene && scene.visual ? scene.visual : '待补充'}\n限制：无旁白、无字幕、无 UI。`,
+          model: { name: modelFor('video'), mode: '图生视频', refs: '场景图 + 运镜说明' }
+        });
+      }
+      function itemRow(p, item) {
+        return {
+          id: item.id, project_id: p.id, scene_id: item.sceneId, type: item.type,
+          title: item.title, descr: item.desc, status: item.status, owner_id: item.ownerId,
+          prompt: item.prompt, model_name: item.model.name, model_mode: item.model.mode, model_refs: item.model.refs,
+          created_at: item.createdAt, updated_at: item.updatedAt
+        };
+      }
+      async function insertTaskItem(p, type, sceneId, sceneTitle) {
+        const item = mkTaskItem(p, type, sceneId, sceneTitle);
+        const itemWrite = await cw(sb.from('items').insert(itemRow(p, item)), '创建任务');
+        return itemWrite.ok ? item : null;
+      }
+      async function mkCopyItem(p) {
+        const t = now();
+        const item = {
+          id: uuid(), type: 'copy', sceneId: null, title: '发布文案',
+          desc: '标题 / 简介 / 话题标签。', status: 'todo', ownerId: roleUser(p, 'script').id,
+          asset: null, prompt: '把成片转写成发布标题与简介，保留悬念结构。',
+          model: { name: modelFor('text'), mode: '标题 / 简介 / 话题标签', refs: '定稿脚本' },
+          versions: [], comments: [], createdAt: t, updatedAt: t
+        };
+        const itemWrite = await cw(sb.from('items').insert(itemRow(p, item)), '创建文案');
+        if (!itemWrite.ok) return null;
+        p.items.push(item);
+        touchLocal(p, item);
+        return item;
+      }
+      function deleteProject(id) {
+        const proj = db.projects.find(p => p.id === id);
+        if (!proj) return;
+        const files = proj.items.flatMap(i => i.versions.filter(v => v.filePath).map(v => v.filePath));
+        if (files.length) cw(sb.storage.from('assets').remove(files), '删除文件');
+        db.projects = db.projects.filter(p => p.id !== id);
+        if (state.projectId === id) {
+          state.projectId = db.projects.length ? db.projects[0].id : null;
+          const np = getProject();
+          state.tab = 'scenes';
+          state.sceneId = np && np.scenes.length ? np.scenes[0].id : null;
+          state.sel = null;
+          state.selVersion = null;
+        }
+        cw(sb.from('projects').delete().eq('id', id), '删除项目');
+      }
+      async function createProject(topicId, title) {
+        const topic = topicById(topicId);
+        if (!topic) return null;
+        const t = now();
+        const name = (title || '').trim() || `${topic.name.split(' / ')[0]} · 新项目`;
+        const project = {
+          id: uuid(), topicId: topic.id, title: name,
+          meta: `选题：${topic.name} · 目标形式与时长待定义`,
+          status: '筹备中', createdAt: t, updatedAt: t,
+          members: db.users.map(u => ({ userId: u.id, role: u.role })),
+          scenes: [], items: [], sources: []
+        };
+        db.projects.unshift(project);
+        const projectWrite = await cw(sb.from('projects').insert({ id: project.id, topic_id: topic.id, title: name, meta: project.meta, status: project.status, created_at: t, updated_at: t }), '创建项目');
+        if (!projectWrite.ok) {
+          db.projects = db.projects.filter(p => p.id !== project.id);
+          return null;
+        }
+        await Promise.all(project.members.map(m => cw(sb.from('project_members').insert({ project_id: project.id, user_id: m.userId, role: m.role }), '添加项目成员')));
+        const script = {
+          id: uuid(), type: 'script', sceneId: null,
+          title: '分镜脚本', desc: `从选题「${topic.name}」创建。先确定内容边界与画面母题，再拆分场景。`,
+          status: 'todo', ownerId: roleUser(project, 'script').id, asset: null,
+          prompt: `主题：${topic.name}\n关键词：${topic.tags.slice(0, 12).join('、')}\n\n目标：无旁白 3 分钟短片分镜脚本（约 8 个场景）。先定内容边界与画面母题。`,
+          model: { name: modelFor('text'), mode: '无旁白分镜写作', refs: '选题库关键词与内容标签' },
+          versions: [], comments: [], createdAt: t, updatedAt: t
+        };
+        project.items.push(script);
+        const scriptWrite = await cw(sb.from('items').insert(itemRow(project, script)), '创建脚本任务');
+        if (!scriptWrite.ok) project.items = project.items.filter(item => item.id !== script.id);
+        return project;
+      }
+      const AVATAR_MAX_BYTES = 4 * 1024 * 1024;
+      async function uploadMyAvatar(file) {
+        const me = curUser();
+        if (!file) return;
+        if (!/^image\//.test(file.type)) { toast('请选择图片文件'); return; }
+        if (file.size > AVATAR_MAX_BYTES) { toast(`图片超过 4MB（当前 ${(file.size / 1048576).toFixed(1)}MB），请先压缩`); return; }
+        const btn = el('meAvatarBtn');
+        const label = btn ? btn.textContent : '';
+        if (btn) { btn.disabled = true; btn.textContent = '上传中…'; }
+        const ext = (file.name.split('.').pop() || 'png').toLowerCase().replace(/[^a-z0-9]/g, '') || 'png';
+        const objectPath = `avatars/${me.id}-${Date.now()}.${ext}`;
+        const { error: upErr } = await sb.storage.from('assets').upload(objectPath, file, { contentType: file.type || undefined });
+        if (btn) { btn.disabled = false; btn.textContent = label; }
+        if (upErr) { toast('头像上传失败：' + upErr.message); return; }
+        const saved = await cw(sb.from('profiles').update({ avatar_path: objectPath }).eq('id', me.id), '保存头像');
+        if (!saved.ok) {
+          sb.storage.from('assets').remove([objectPath]);
+          toast('保存头像失败。若提示字段不存在，请先在 Supabase 执行 supabase-avatar-migration.sql');
+          return;
+        }
+        const oldPath = me.avatarPath;
+        const { data: signed } = await sb.storage.from('assets').createSignedUrl(objectPath, 28800);
+        me.avatarPath = objectPath;
+        me.avatarUrl = signed ? (signed.signedUrl || signed.signedURL || null) : null;
+        if (oldPath && oldPath !== objectPath) sb.storage.from('assets').remove([oldPath]);
+        renderAll();
+        toast('头像已更新');
+      }
+      async function clearMyAvatar() {
+        const me = curUser();
+        if (!me.avatarPath) return;
+        const oldPath = me.avatarPath;
+        const saved = await cw(sb.from('profiles').update({ avatar_path: null }).eq('id', me.id), '移除头像');
+        if (!saved.ok) return;
+        me.avatarPath = null;
+        me.avatarUrl = null;
+        sb.storage.from('assets').remove([oldPath]);
+        renderAll();
+        toast('已移除头像，恢复文字头像');
+      }
+      function updateMyProfile(patch) {
+        const me = userById(db.currentUserId);
+        Object.assign(me, patch);
+        if (patch.name) me.short = patch.name.slice(0, 1);
+        cw(sb.from('profiles').update({ name: me.name, short: me.short, role: me.role }).eq('id', me.id), '更新资料');
+      }
+
+      /* =====================================================================
+         AI 流水线（主题 → 概要 → 剧本 → 分镜与资产 → 生成）
+         每一步都停下确认；生成统一走 Edge Function generate，前端不接触密钥。
+         ===================================================================== */
+      const PIPE_STAGES = [
+        ['topic', '主题'], ['concept', '内容概要'], ['script', '剧本'],
+        ['breakdown', '分镜与资产'], ['generate', '生成'],
+      ];
+      const KIND_CN = { character: '角色', environment: '环境', prop: '道具' };
+      const stageIdx = s => { const i = PIPE_STAGES.findIndex(x => x[0] === s); return i < 0 ? 0 : i; };
+      const draftKey = k => `${state.projectId}:${k}`;
+      const getDraft = (k, fb) => { const v = state.drafts[draftKey(k)]; return v === undefined ? fb : v; };
+      const setDraft = (k, v) => { state.drafts[draftKey(k)] = v; };
+
+      async function callGenerate(body) {
+        try {
+          const { data, error } = await sb.functions.invoke('generate', { body });
+          if (error) {
+            let msg = error.message || '调用失败';
+            try { const j = await error.context.json(); if (j && j.error) msg = j.error; } catch (e2) {}
+            return { ok: false, error: msg };
+          }
+          if (data && data.error && !data.ok) return { ok: false, error: data.error };
+          return data || { ok: false, error: '空响应' };
+        } catch (e) { return { ok: false, error: e && e.message ? e.message : String(e) }; }
+      }
+      async function createJob(p, kind, targetTable, targetId, request) {
+        const id = uuid();
+        await cw(sb.from('jobs').insert({ id, project_id: p.id, kind, target_table: targetTable, target_id: targetId, status: 'running', request, created_by: db.currentUserId }), '记录任务');
+        return id;
+      }
+      async function finishJob(jobId, ok, patch) {
+        await cw(sb.from('jobs').update(Object.assign({ status: ok ? 'succeeded' : 'failed', updated_at: now() }, patch || {})).eq('id', jobId), '更新任务');
+      }
+      async function saveProjectPatch(p, dbPatch, mirrorPatch) {
+        Object.assign(p, mirrorPatch || {});
+        p.updatedAt = now();
+        await cw(sb.from('projects').update(Object.assign({ updated_at: p.updatedAt }, dbPatch)).eq('id', p.id), '保存项目');
+      }
+      function stripJson(text) {
+        let t = String(text || '').trim();
+        const m = t.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (m) t = m[1].trim();
+        const a = t.indexOf('{'); const b = t.lastIndexOf('}');
+        if (a >= 0 && b > a) t = t.slice(a, b + 1);
+        return t;
+      }
+      async function imageResultToUpload(r) {
+        if (r.b64) { const res = await fetch(`data:image/png;base64,${r.b64}`); return { blob: await res.blob() }; }
+        if (r.url) {
+          try { const res = await fetch(r.url); if (res.ok) return { blob: await res.blob() }; } catch (e) {}
+          return { externalUrl: r.url };
+        }
+        return null;
+      }
+      function busyHtml(key, idleLabel) {
+        return state.busy[key] ? `<span class="spin"></span><span class="pipe-hint">${esc(state.busy[key])}</span>` : idleLabel;
+      }
+      function setBusy(key, text) { if (text) state.busy[key] = text; else delete state.busy[key]; }
+
+      /* ---------- 资产：写入与生成 ---------- */
+      async function registerAssetFile(p, asset, up, label, promptSnap, modelSnap) {
+        const id = uuid();
+        let filePath = null, src = null;
+        if (up && up.blob) {
+          filePath = `asset-imgs/${asset.id}/${Date.now()}.png`;
+          const w = await sb.storage.from('assets').upload(filePath, up.blob, { contentType: 'image/png' });
+          if (w.error) { toast('资产图上传失败：' + w.error.message); return null; }
+          const { data: signed } = await sb.storage.from('assets').createSignedUrl(filePath, 28800);
+          src = signed ? signed.signedUrl : null;
+        } else if (up && up.externalUrl) {
+          filePath = up.externalUrl; src = up.externalUrl;
+        } else return null;
+        const ins = await cw(sb.from('asset_files').insert({ id, asset_id: asset.id, file_path: filePath, label, prompt_snapshot: promptSnap, model_snapshot: modelSnap, created_by: db.currentUserId }), '登记资产图');
+        if (!ins.ok) return null;
+        const rec = { id, path: filePath, label, promptSnap, modelSnap, by: db.currentUserId, at: now(), src };
+        asset.files.push(rec);
+        if (!asset.primaryFileId) {
+          asset.primaryFileId = id; asset.primarySrc = src; asset.status = 'review';
+          await cw(sb.from('assets').update({ primary_file_id: id, status: 'review', updated_at: now() }).eq('id', asset.id), '设置主图');
+        }
+        return rec;
+      }
+      async function genAssetImage(p, asset) {
+        const key = `a:${asset.id}`;
+        if (state.busy[key]) return;
+        if (!asset.prompt) { toast(`「${asset.name}」还没有提示词`); return; }
+        setBusy(key, '生成中…'); renderWorkspace();
+        const jobId = await createJob(p, 'asset_image', 'assets', asset.id, { prompt: asset.prompt });
+        const r = await callGenerate({ action: 'image', prompt: asset.prompt });
+        if (!r.ok) {
+          await finishJob(jobId, false, { error: r.error });
+          toast(`「${asset.name}」生成失败：${r.error}`);
+        } else {
+          const up = await imageResultToUpload(r);
+          const rec = up ? await registerAssetFile(p, asset, up, `AI 生成 · ${r.model}`, asset.prompt, r.model) : null;
+          await finishJob(jobId, !!rec, { model: r.model || '', model_tried: JSON.stringify(r.tried || []) });
+          if (rec) toast(`「${asset.name}」已生成（${r.model}）`);
+        }
+        setBusy(key); renderAll();
+      }
+      async function setAssetPrimary(p, asset, fileId) {
+        const f = asset.files.find(x => x.id === fileId); if (!f) return;
+        asset.primaryFileId = fileId; asset.primarySrc = f.src;
+        await cw(sb.from('assets').update({ primary_file_id: fileId, updated_at: now() }).eq('id', asset.id), '设置主图');
+        renderWorkspace();
+      }
+      async function saveAssetPrompt(p, asset, text) {
+        asset.prompt = text;
+        await cw(sb.from('assets').update({ prompt: text, updated_at: now() }).eq('id', asset.id), '保存资产提示词');
+      }
+      async function deleteAssetRow(p, asset) {
+        const paths = asset.files.map(f => f.path).filter(x => x && !/^https?:/.test(x));
+        if (paths.length) cw(sb.storage.from('assets').remove(paths), '删除资产文件');
+        p.assets = p.assets.filter(a => a.id !== asset.id);
+        p.scenes.forEach(s => { s.assetIds = (s.assetIds || []).filter(id => id !== asset.id); });
+        await cw(sb.from('assets').delete().eq('id', asset.id), '删除资产');
+        renderAll();
+      }
+
+      /* ---------- 场景画面 / 视频生成 ---------- */
+      async function genSceneImage(p, scene) {
+        const item = sceneItem(p, 'image', scene.id);
+        if (!item) { toast('该场景没有画面任务'); return; }
+        const prompt = scene.imagePrompt || item.prompt;
+        if (!prompt) { toast('先填写画面提示词'); return; }
+        const key = `si:${scene.id}`;
+        if (state.busy[key]) return;
+        const refs = (scene.assetIds || []).map(id => { const a = p.assets.find(x => x.id === id); return a ? a.primarySrc : null; }).filter(Boolean);
+        setBusy(key, '生成画面…'); renderWorkspace();
+        const jobId = await createJob(p, 'scene_image', 'items', item.id, { prompt, refs: refs.length });
+        const r = await callGenerate({ action: 'image', prompt, refImages: refs });
+        if (!r.ok) {
+          await finishJob(jobId, false, { error: r.error });
+          toast(`「${scene.title}」画面生成失败：${r.error}`);
+        } else {
+          const up = await imageResultToUpload(r);
+          let done = false;
+          if (up && up.blob) {
+            if (item.model.name !== r.model) { item.model.name = r.model; cw(sb.from('items').update({ model_name: r.model }).eq('id', item.id)); }
+            const file = new File([up.blob], `${scene.title || 'scene'}.png`, { type: 'image/png' });
+            done = await addVersion(p, item, `AI 生成 · ${r.model}`, file) !== false;
+          } else if (up && up.externalUrl) {
+            const vid = uuid(); const vNo = item.versions.length + 1;
+            const w = await cw(sb.from('item_versions').insert({ id: vid, item_id: item.id, v: vNo, note: `AI 生成（外链） · ${r.model}`, file_path: up.externalUrl, prompt_snapshot: prompt, model_snapshot: r.model, created_by: db.currentUserId }), '登记版本');
+            if (w.ok) { const ver = { id: vid, v: vNo, at: now(), by: db.currentUserId, note: `AI 生成（外链） · ${r.model}`, filePath: up.externalUrl, src: up.externalUrl, prompt, model: r.model }; item.versions.push(ver); item.asset = { src: up.externalUrl, label: item.title }; done = true; }
+          }
+          if (done && (item.status === 'todo' || item.status === 'doing')) { item.status = 'review'; cw(sb.from('items').update({ status: 'review', updated_at: now() }).eq('id', item.id)); }
+          await finishJob(jobId, done, { model: r.model || '', model_tried: JSON.stringify(r.tried || []) });
+          if (done) toast(`「${scene.title}」画面已生成（${r.model}）`);
+        }
+        setBusy(key); renderAll();
+      }
+      async function registerVideoResult(p, item, url, prompt, model) {
+        let up = null;
+        try { const res = await fetch(url); if (res.ok) up = { blob: await res.blob() }; } catch (e) {}
+        if (up && up.blob) {
+          if (item.model.name !== model) { item.model.name = model; cw(sb.from('items').update({ model_name: model }).eq('id', item.id)); }
+          const file = new File([up.blob], 'shot.mp4', { type: up.blob.type || 'video/mp4' });
+          return await addVersion(p, item, `AI 生成 · ${model}`, file) !== false;
+        }
+        const vid = uuid(); const vNo = item.versions.length + 1;
+        const w = await cw(sb.from('item_versions').insert({ id: vid, item_id: item.id, v: vNo, note: `AI 生成（外链） · ${model}`, file_path: url, prompt_snapshot: prompt, model_snapshot: model, created_by: db.currentUserId }), '登记版本');
+        if (!w.ok) return false;
+        item.versions.push({ id: vid, v: vNo, at: now(), by: db.currentUserId, note: `AI 生成（外链） · ${model}`, filePath: url, src: url, prompt, model });
+        item.asset = { src: url, label: item.title };
+        return true;
+      }
+      async function genSceneVideo(p, scene) {
+        const vItem = sceneItem(p, 'video', scene.id);
+        const iItem = sceneItem(p, 'image', scene.id);
+        if (!vItem) { toast('该场景没有视频任务'); return; }
+        const first = iItem ? currentSrc(iItem) : null;
+        if (!first) { toast('先生成场景画面，视频需要它当首帧'); return; }
+        const prompt = scene.videoPrompt || vItem.prompt || '';
+        const key = `sv:${scene.id}`;
+        if (state.busy[key]) return;
+        setBusy(key, '提交视频任务…'); renderWorkspace();
+        const jobId = await createJob(p, 'scene_video', 'items', vItem.id, { prompt });
+        const r = await callGenerate({ action: 'video', prompt, firstFrameUrl: first });
+        if (!r.ok) {
+          await finishJob(jobId, false, { error: r.error });
+          toast(`「${scene.title}」视频生成失败：${r.error}`);
+          setBusy(key); renderAll(); return;
+        }
+        if (r.url) {
+          const done = await registerVideoResult(p, vItem, r.url, prompt, r.model);
+          if (done && (vItem.status === 'todo' || vItem.status === 'doing')) { vItem.status = 'review'; cw(sb.from('items').update({ status: 'review', updated_at: now() }).eq('id', vItem.id)); }
+          await finishJob(jobId, done, { model: r.model || '' });
+          if (done) toast(`「${scene.title}」视频已生成（${r.model}）`);
+          setBusy(key); renderAll(); return;
+        }
+        if (r.pending && r.taskId) {
+          await cw(sb.from('jobs').update({ external_id: r.taskId, model: r.model || '' }).eq('id', jobId), '记录任务号');
+          setBusy(key, '视频生成中（约 1-3 分钟）…'); renderWorkspace();
+          pollVideoLoop(p.id, jobId, r.taskId, vItem.id, scene.id, prompt, r.model, 0);
+          return;
+        }
+        await finishJob(jobId, false, { error: '中转站未返回视频地址或任务号' });
+        toast('视频接口返回了无法识别的结果，已记录任务日志');
+        setBusy(key); renderAll();
+      }
+      async function pollVideoLoop(projectId, jobId, taskId, itemId, sceneId, prompt, model, tries) {
+        if (tries > 60) {
+          await finishJob(jobId, false, { error: '轮询超时（8 分钟）' });
+          setBusy(`sv:${sceneId}`); toast('视频生成超时，可稍后在任务记录里重试'); renderAll(); return;
+        }
+        await new Promise(res => setTimeout(res, 8000));
+        const p = db.projects.find(x => x.id === projectId);
+        if (!p) return;
+        const r = await callGenerate({ action: 'poll_video', taskId });
+        if (r && r.ok && r.url) {
+          const item = itemById(p, itemId);
+          const done = item ? await registerVideoResult(p, item, r.url, prompt, model) : false;
+          if (done && item && (item.status === 'todo' || item.status === 'doing')) { item.status = 'review'; cw(sb.from('items').update({ status: 'review', updated_at: now() }).eq('id', item.id)); }
+          await finishJob(jobId, done, { model: model || '' });
+          setBusy(`sv:${sceneId}`);
+          if (done) toast('视频已生成完成'); renderAll(); return;
+        }
+        if (r && r.ok === false) {
+          await finishJob(jobId, false, { error: r.error || '轮询失败' });
+          setBusy(`sv:${sceneId}`); toast('视频任务查询失败：' + (r.error || '')); renderAll(); return;
+        }
+        pollVideoLoop(projectId, jobId, taskId, itemId, sceneId, prompt, model, tries + 1);
+      }
+
+      /* ---------- 文本生成（各步骤提示词） ---------- */
+      function topicLine(p) {
+        const t = topicById(p.topicId);
+        return p.topicText || (t ? t.name : p.title);
+      }
+      async function pipeGenText(p, key, jobKind, prompt, system) {
+        if (state.busy[key]) return null;
+        setBusy(key, '生成中…'); renderWorkspace();
+        const jobId = await createJob(p, jobKind, 'projects', p.id, { prompt: prompt.slice(0, 4000) });
+        const r = await callGenerate({ action: 'text', prompt, system });
+        await finishJob(jobId, !!r.ok, r.ok ? { model: r.model || '' } : { error: r.error });
+        setBusy(key);
+        if (!r.ok) { toast('生成失败：' + r.error); renderWorkspace(); return null; }
+        return r;
+      }
+      async function ensureTextItem(p, type, title) {
+        let item = itemsOf(p, type)[0];
+        if (item) return item;
+        const t = now();
+        item = { id: uuid(), type, sceneId: null, title, desc: '', status: 'doing', ownerId: db.currentUserId,
+          prompt: '', model: { name: 'claude-opus-5', mode: 'AI 流水线', refs: '' },
+          versions: [], comments: [], asset: null, createdAt: t, updatedAt: t };
+        p.items.push(item);
+        await cw(sb.from('items').insert({ id: item.id, project_id: p.id, scene_id: null, type, title, descr: '', status: 'doing', owner_id: item.ownerId, prompt: '', model_name: item.model.name, model_mode: item.model.mode, model_refs: '', created_at: t, updated_at: t }), '创建任务');
+        return item;
+      }
+      async function saveTextVersion(p, item, body, note) {
+        const vNo = item.versions.length + 1;
+        const vid = uuid();
+        const w = await cw(sb.from('item_versions').insert({ id: vid, item_id: item.id, v: vNo, note: note || `第 ${vNo} 版`, body, prompt_snapshot: item.prompt || '', model_snapshot: item.model.name, created_by: db.currentUserId, created_at: now() }), '保存版本');
+        if (!w.ok) return false;
+        item.versions.push({ id: vid, v: vNo, at: now(), by: db.currentUserId, note: note || `第 ${vNo} 版`, body, prompt: item.prompt || '', model: item.model.name });
+        item.updatedAt = now();
+        cw(sb.from('items').update({ updated_at: item.updatedAt }).eq('id', item.id));
+        return true;
+      }
+      const latestBody = item => { if (!item) return ''; const withBody = item.versions.filter(v => v.body); return withBody.length ? withBody[withBody.length - 1].body : ''; };
+
+      /* ---------- 分镜结构化生成与落库 ---------- */
+      function breakdownPrompt(p) {
+        const concept = latestBody(itemsOf(p, 'concept')[0]);
+        const script = latestBody(itemsOf(p, 'script')[0]);
+        return `根据以下无旁白短片剧本，输出分镜与数字资产清单。
+
+主题：${topicLine(p)}
+内容概要：${concept}
+剧本：
+${script}
+
+要求：
+1. 只输出一个 JSON 对象，不要任何解释、不要 markdown 代码块。
+2. 结构：{"assets":[{"ref_key","kind","name","descr","prompt"}],"scenes":[{"title","time","action","visual","sound","edit","image_prompt","video_prompt","asset_refs":["ref_key"]}]}
+3. assets：整片需要的数字资产。kind 只能是 character / environment / prop；ref_key 用英文小写加下划线并带前缀（char_ / env_ / prop_）；prompt 是给图片模型的生成提示词（中文，含画风、光线、材质约束，写明"不出现文字、水印"）。资产控制在 3-6 个。
+4. scenes：6-10 个场景。time 用 "00:00-00:18" 格式并覆盖全片；image_prompt 描述该场景静帧画面（会以 asset_refs 对应的资产图作参考图）；video_prompt 描述由该静帧出发 5 秒内的镜头运动与画面变化；asset_refs 只引用 assets 里出现过的 ref_key。
+5. 全部使用中文（ref_key 除外）。`;
+      }
+      function parseBreakdown(text) {
+        try {
+          const d = JSON.parse(stripJson(text));
+          if (!Array.isArray(d.assets) || !Array.isArray(d.scenes) || !d.scenes.length) return null;
+          return d;
+        } catch (e) { return null; }
+      }
+      async function applyBreakdown(p, parsed) {
+        setBusy('bk-apply', '写入项目中…'); renderWorkspace();
+        await cw(sb.from('scenes').delete().eq('project_id', p.id), '清理旧场景');
+        await cw(sb.from('assets').delete().eq('project_id', p.id), '清理旧资产');
+        await cw(sb.from('items').delete().eq('project_id', p.id).in('type', ['image', 'video']), '清理旧任务');
+        const refMap = {};
+        for (const a of parsed.assets) {
+          const id = uuid();
+          const kind = ['character', 'environment', 'prop'].includes(a.kind) ? a.kind : 'prop';
+          refMap[a.ref_key] = id;
+          await cw(sb.from('assets').insert({ id, project_id: p.id, kind, ref_key: String(a.ref_key || id).slice(0, 60), name: a.name || a.ref_key, descr: a.descr || '', prompt: a.prompt || '', model_name: 'gpt-image-2-2k', status: 'todo', owner_id: roleUser(p, 'visual').id }), '写入资产');
+        }
+        let pos = 0;
+        for (const s of parsed.scenes) {
+          pos += 1;
+          const sid = uuid();
+          await cw(sb.from('scenes').insert({ id: sid, project_id: p.id, position: pos, time_code: s.time || '', title: s.title || `场景 ${pos}`, action: s.action || '', visual: s.visual || '', sound: s.sound || '', edit: s.edit || '', image_prompt: s.image_prompt || '', video_prompt: s.video_prompt || '' }), '写入场景');
+          for (const ref of (s.asset_refs || [])) {
+            if (refMap[ref]) await cw(sb.from('scene_assets').insert({ scene_id: sid, asset_id: refMap[ref] }), '关联资产');
+          }
+          const t = now();
+          await cw(sb.from('items').insert({ id: uuid(), project_id: p.id, scene_id: sid, type: 'image', title: `${s.title || `场景 ${pos}`} · 场景图`, descr: s.visual || '', status: 'todo', owner_id: roleUser(p, 'visual').id, prompt: s.image_prompt || '', model_name: 'gpt-image-2-2k', model_mode: '参考图生成', model_refs: (s.asset_refs || []).join(' / '), created_at: t, updated_at: t }), '写入画面任务');
+          await cw(sb.from('items').insert({ id: uuid(), project_id: p.id, scene_id: sid, type: 'video', title: `${s.title || `场景 ${pos}`} · 动态镜头`, descr: '', status: 'todo', owner_id: roleUser(p, 'video').id, prompt: s.video_prompt || '', model_name: 'seedance-2.0-fast-480p-933-s-ff', model_mode: '图生视频（首帧）', model_refs: '场景图', created_at: t, updated_at: t }), '写入视频任务');
+        }
+        await saveProjectPatch(p, { stage: 'generate' }, { stage: 'generate' });
+        setDraft('bk', '');
+        setBusy('bk-apply');
+        await loadAll();
+        toast(`分镜已应用：${parsed.scenes.length} 个场景、${parsed.assets.length} 个资产`);
+        renderAllPreserve();
+      }
+
+      /* ---------- 流水线视图 ---------- */
+      function renderPipelineView() {
+        const p = getProject();
+        const curStage = p.stage === 'done' ? 'generate' : (p.stage || 'topic');
+        const cur = stageIdx(curStage);
+        const steps = PIPE_STAGES.map(([key, label], i) => {
+          const cls = i < cur ? 'done' : (i === cur ? 'active' : 'todo');
+          return `<button type="button" class="pipe-step ${cls}" data-stage-jump="${key}" ${i > cur ? 'disabled' : ''}>${i < cur ? '✓ ' : `${i + 1} `}${label}</button>`;
+        }).join('');
+        let pane = '';
+        if (curStage === 'topic') pane = paneTopic(p);
+        else if (curStage === 'concept') pane = paneConcept(p);
+        else if (curStage === 'script') pane = paneScript(p);
+        else if (curStage === 'breakdown') pane = paneBreakdown(p);
+        else pane = paneGenerate(p);
+        viewRoot.innerHTML = `<div class="view-head"><h2>AI 流水线</h2><span class="gk">PIPELINE · ${cur + 1}/5</span></div>
+          <div class="pipe-steps">${steps}</div>
+          <div class="pipe-pane">${pane}</div>`;
+        viewRoot.querySelectorAll('[data-stage-jump]').forEach(b => b.addEventListener('click', () => {
+          const target = b.dataset.stageJump;
+          if (stageIdx(target) >= stageIdx(p.stage === 'done' ? 'generate' : p.stage) && target !== curStage) return;
+          if (target === curStage) return;
+          armOr(b, '回到此步？', async () => { await saveProjectPatch(p, { stage: target }, { stage: target }); renderWorkspace(); });
+        }));
+        bindPipelinePane(p, curStage);
+      }
+      function paneTopic(p) {
+        const t = topicById(p.topicId);
+        const cands = getDraft('cands', null);
+        return `<div class="pipe-block">
+          <h3>确定主题</h3>
+          <p class="pipe-sub">当前选题分类：${esc(t ? t.name : '未分类')}。可以直接确认，也可以先写一句方向让 AI 推荐主题。</p>
+          <input class="pipe-in" id="pipeBrief" placeholder="一句话方向，如：金字塔内部未解的空腔（可空）" value="${esc(getDraft('brief', p.brief || ''))}" />
+          <div class="pipe-actions">
+            <button class="pill sm accent" type="button" id="pipeSuggest">${state.busy['topic-gen'] ? '' : 'AI 推荐主题'}</button>
+            ${busyHtml('topic-gen', '')}
+          </div>
+          ${cands ? `<div>${cands.map((c, i) => `<button type="button" class="cand" data-cand="${i}"><b>${esc(c.title)}</b><span>${esc(c.hook || '')}</span></button>`).join('')}</div>` : ''}
+          <div class="pipe-actions" style="margin-top:16px;border-top:1px dashed #ddd7cb;padding-top:14px;flex-wrap:nowrap">
+            <input class="pipe-in" id="pipeTopic" placeholder="主题标题" value="${esc(getDraft('topic', p.topicText || (t ? t.name : '')))}" />
+            <button class="pill sm solid" type="button" id="pipeTopicOk" style="flex:none">确认主题，下一步</button>
+          </div>
+        </div>`;
+      }
+      function paneConcept(p) {
+        const item = itemsOf(p, 'concept')[0];
+        const text = getDraft('concept', latestBody(item));
+        return `<div class="pipe-block">
+          <h3>内容概要</h3>
+          <p class="pipe-sub">主题：${esc(topicLine(p))} — 用 150-250 字说清这条片子表达什么、情绪基调、结尾落点。可先 AI 生成再手改。</p>
+          <textarea class="pipe-ta" id="pipeConcept" placeholder="点下方按钮生成，或直接手写…">${esc(text)}</textarea>
+          <div class="pipe-actions">
+            <button class="pill sm accent" type="button" id="pipeConceptGen">${state.busy['concept-gen'] ? '' : 'AI 生成概要'}</button>
+            ${busyHtml('concept-gen', '')}
+            <span style="flex:1"></span>
+            <button class="pill sm solid" type="button" id="pipeConceptOk">确认概要，下一步</button>
+          </div>
+          ${item && item.versions.length ? `<p class="pipe-hint">已有 ${item.versions.length} 个历史版本，确认会保存为新版本。</p>` : ''}
+        </div>`;
+      }
+      function paneScript(p) {
+        const item = itemsOf(p, 'script')[0];
+        const text = getDraft('script', latestBody(item));
+        return `<div class="pipe-block">
+          <h3>剧本</h3>
+          <p class="pipe-sub">基于已确认的概要生成完整无旁白剧本（可手改）。确认后进入分镜。</p>
+          <textarea class="pipe-ta" id="pipeScript" style="min-height:260px" placeholder="点下方按钮生成，或直接手写…">${esc(text)}</textarea>
+          <div class="pipe-actions">
+            <button class="pill sm accent" type="button" id="pipeScriptGen">${state.busy['script-gen'] ? '' : 'AI 生成剧本'}</button>
+            ${busyHtml('script-gen', '')}
+            <span style="flex:1"></span>
+            <button class="pill sm solid" type="button" id="pipeScriptOk">确认剧本，下一步</button>
+          </div>
+        </div>`;
+      }
+      function paneBreakdown(p) {
+        const raw = getDraft('bk', '');
+        const parsed = raw ? parseBreakdown(raw) : null;
+        return `<div class="pipe-block">
+          <h3>分镜与资产清单</h3>
+          <p class="pipe-sub">AI 把剧本拆成 6-10 个场景，并列出全片需要的数字资产（角色/环境/道具）与每个场景的画面、视频提示词。生成后先预览，确认无误再应用。</p>
+          <div class="pipe-actions">
+            <button class="pill sm accent" type="button" id="pipeBkGen">${state.busy['bk-gen'] ? '' : (parsed ? '重新生成' : 'AI 生成分镜与资产')}</button>
+            ${busyHtml('bk-gen', '')}
+          </div>
+          ${parsed ? `<div class="bk-cols">
+            <div class="bk-list"><h4>场景 × ${parsed.scenes.length}</h4>${parsed.scenes.map((s, i) => `<div class="bk-row"><b>S${String(i + 1).padStart(2, '0')} ${esc(s.title || '')}</b> <span class="gk">${esc(s.time || '')}</span><br>${esc(trunc(s.action || '', 60))}<br><span class="bk-refs">${esc((s.asset_refs || []).join(' · '))}</span></div>`).join('')}</div>
+            <div class="bk-list"><h4>资产 × ${parsed.assets.length}</h4>${parsed.assets.map(a => `<div class="bk-row"><b>${esc(KIND_CN[a.kind] || a.kind)} · ${esc(a.name || '')}</b> <span class="bk-refs">${esc(a.ref_key || '')}</span><br>${esc(trunc(a.descr || '', 56))}</div>`).join('')}</div>
+          </div>
+          <div class="pipe-actions">
+            ${p.scenes.length ? '<span class="pipe-err">应用会覆盖现有场景与画面/视频任务</span>' : ''}
+            <span style="flex:1"></span>
+            <button class="pill sm solid" type="button" id="pipeBkApply">${state.busy['bk-apply'] ? '' : '应用到项目，下一步'}</button>
+            ${busyHtml('bk-apply', '')}
+          </div>` : (raw ? '<p class="pipe-err" style="margin-top:10px">上次生成的结果无法解析为分镜结构，请重新生成。</p>' : '')}
+        </div>`;
+      }
+      function paneGenerate(p) {
+        const assetRows = p.assets.map(a => `<div class="gen-row">
+            <span class="gen-thumb">${a.primarySrc ? `<img src="${esc(a.primarySrc)}" alt="" />` : '<span class="ph2">待生成</span>'}</span>
+            <span class="gen-main"><b>${esc(KIND_CN[a.kind] || '')} · ${esc(a.name)}</b><span>${esc(a.refKey)} · ${a.files.length} 张 · ${STATUS[a.status] ? STATUS[a.status].label : a.status}</span></span>
+            <button class="pill sm" type="button" data-gen-asset="${a.id}">${state.busy[`a:${a.id}`] ? '生成中…' : (a.files.length ? '再生成' : '生成')}</button>
+          </div>`).join('');
+        const sceneRows = p.scenes.map((s, i) => {
+          const iItem = sceneItem(p, 'image', s.id);
+          const vItem = sceneItem(p, 'video', s.id);
+          const iSrc = iItem ? currentSrc(iItem) : null;
+          const vSrc = vItem ? currentSrc(vItem) : null;
+          const refsReady = (s.assetIds || []).every(id => { const a = p.assets.find(x => x.id === id); return a && a.primarySrc; });
+          return `<div class="gen-row">
+            <span class="gen-thumb">${iSrc ? `<img src="${esc(iSrc)}" alt="" />` : '<span class="ph2">待生成</span>'}</span>
+            <span class="gen-main"><b>S${String(i + 1).padStart(2, '0')} ${esc(s.title)}</b><span>${esc(s.time || '')} · 画面${iSrc ? '✓' : '—'} · 视频${vSrc ? '✓' : '—'}</span></span>
+            <button class="pill sm" type="button" data-gen-simg="${s.id}" ${refsReady ? '' : 'title="所引用的资产还没有主图" disabled'}>${state.busy[`si:${s.id}`] ? '生成中…' : (iSrc ? '重生成画面' : '生成画面')}</button>
+            <button class="pill sm" type="button" data-gen-svid="${s.id}" ${iSrc ? '' : 'disabled title="先生成画面"'}>${state.busy[`sv:${s.id}`] ? esc(state.busy[`sv:${s.id}`]) : (vSrc ? '重生成视频' : '生成视频')}</button>
+          </div>`;
+        }).join('');
+        const allDone = p.scenes.length && p.scenes.every(s => { const v = sceneItem(p, 'video', s.id); return v && currentSrc(v); });
+        return `<div class="pipe-block">
+          <h3>① 数字资产图 <span class="gk">${p.assets.filter(a => a.primarySrc).length}/${p.assets.length}</span></h3>
+          <p class="pipe-sub">先把角色/环境/道具生成出来，它们的主图会作为参考图保证各场景一致。要改提示词去「资产」标签页。</p>
+          <div class="gen-rows">${assetRows || '<p class="pipe-hint">没有资产。回上一步生成分镜与资产清单。</p>'}</div>
+        </div>
+        <div class="pipe-block">
+          <h3>② 场景画面与视频</h3>
+          <p class="pipe-sub">画面 = 提示词 + 该场景资产参考图；视频 = 画面当首帧 + 运镜提示词（Seedance，约 1-3 分钟）。每个场景可单独重生成。</p>
+          <div class="gen-rows">${sceneRows || '<p class="pipe-hint">没有场景。</p>'}</div>
+          <div class="pipe-actions"><span style="flex:1"></span>
+            ${allDone ? '<button class="pill sm solid" type="button" id="pipeFinish">完成流水线</button>' : '<span class="pipe-hint">全部场景出片后可标记完成</span>'}
+          </div>
+        </div>`;
+      }
+      function bindPipelinePane(p, curStage) {
+        const bindDraft = (id, key) => { const e = el(id); if (e) e.addEventListener('input', () => setDraft(key, e.value)); };
+        bindDraft('pipeBrief', 'brief'); bindDraft('pipeTopic', 'topic');
+        bindDraft('pipeConcept', 'concept'); bindDraft('pipeScript', 'script');
+        const on = (id, fn) => { const e = el(id); if (e) e.addEventListener('click', fn); };
+        on('pipeSuggest', async () => {
+          const brief = (el('pipeBrief').value || '').trim();
+          const t = topicById(p.topicId);
+          const r = await pipeGenText(p, 'topic-gen', 'concept',
+            `为一支 3 分钟无旁白科普/悬疑短片推荐 5 个主题。\n方向：${brief || '不限'}\n选题分类：${t ? t.name : '不限'}${t ? `\n可参考关键词：${t.tags.slice(0, 10).join('、')}` : ''}\n只输出 JSON：{"topics":[{"title":"主题标题（12字内）","hook":"一句话为什么值得拍"}]}`,
+            '你是短视频选题策划，只输出要求的 JSON，不要任何其他文字。');
+          if (!r) return;
+          try {
+            const d = JSON.parse(stripJson(r.content));
+            setDraft('cands', (d.topics || []).slice(0, 5));
+          } catch (e) { toast('返回的主题列表无法解析，请重试'); }
+          renderWorkspace();
+        });
+        viewRoot.querySelectorAll('[data-cand]').forEach(b => b.addEventListener('click', () => {
+          const c = (getDraft('cands', []) || [])[Number(b.dataset.cand)];
+          if (c) { setDraft('topic', c.title); renderWorkspace(); }
+        }));
+        on('pipeTopicOk', async () => {
+          const topic = (el('pipeTopic').value || '').trim();
+          if (!topic) { toast('请填写主题'); return; }
+          const brief = (el('pipeBrief').value || '').trim();
+          await saveProjectPatch(p, { topic_text: topic, brief, stage: 'concept' }, { topicText: topic, brief, stage: 'concept' });
+          setDraft('cands', null);
+          renderWorkspace();
+        });
+        on('pipeConceptGen', async () => {
+          const r = await pipeGenText(p, 'concept-gen', 'concept',
+            `为主题「${topicLine(p)}」写一段 150-250 字的短片内容概要。${p.brief ? `创作方向：${p.brief}。` : ''}\n这是 3 分钟无旁白电影感短片：说清表达什么、情绪基调如何推进、结尾落在哪。区分已证实事实与未定论之处。直接输出概要正文，不要标题不要解释。`,
+            '你是纪录片策划。');
+          if (r) { setDraft('concept', r.content.trim()); }
+          renderWorkspace();
+        });
+        on('pipeConceptOk', async () => {
+          const text = (el('pipeConcept').value || '').trim();
+          if (text.length < 30) { toast('概要太短，先写到 30 字以上'); return; }
+          const item = await ensureTextItem(p, 'concept', '内容概要');
+          if (!(await saveTextVersion(p, item, text, `第 ${item.versions.length + 1} 版概要`))) return;
+          await saveProjectPatch(p, { stage: 'script' }, { stage: 'script' });
+          setDraft('concept', undefined);
+          renderWorkspace();
+        });
+        on('pipeScriptGen', async () => {
+          const concept = latestBody(itemsOf(p, 'concept')[0]);
+          const r = await pipeGenText(p, 'script-gen', 'script',
+            `根据以下概要，为 3 分钟无旁白电影感短片写完整剧本。\n\n主题：${topicLine(p)}\n概要：${concept}\n\n要求：按场景分段（六到十场），每场包含场景小标题与该场发生的具体画面动作；无对白无旁白，靠视觉因果讲述；明确画面母题与光色基调；800 字以内。直接输出剧本正文。`,
+            '你是电影短片编剧。');
+          if (r) { setDraft('script', r.content.trim()); }
+          renderWorkspace();
+        });
+        on('pipeScriptOk', async () => {
+          const text = (el('pipeScript').value || '').trim();
+          if (text.length < 100) { toast('剧本太短，先写到 100 字以上'); return; }
+          const item = await ensureTextItem(p, 'script', '无旁白分镜脚本');
+          if (!(await saveTextVersion(p, item, text, `第 ${item.versions.length + 1} 版剧本`))) return;
+          await saveProjectPatch(p, { stage: 'breakdown' }, { stage: 'breakdown' });
+          setDraft('script', undefined);
+          renderWorkspace();
+        });
+        on('pipeBkGen', async () => {
+          const r = await pipeGenText(p, 'bk-gen', 'breakdown', breakdownPrompt(p), '你是分镜师与美术指导，只输出要求的 JSON，不要任何其他文字。');
+          if (r) { setDraft('bk', r.content); }
+          renderWorkspace();
+        });
+        on('pipeBkApply', async () => {
+          const parsed = parseBreakdown(getDraft('bk', ''));
+          if (!parsed) { toast('没有可应用的分镜结果'); return; }
+          await applyBreakdown(p, parsed);
+        });
+        viewRoot.querySelectorAll('[data-gen-asset]').forEach(b => b.addEventListener('click', () => {
+          const a = p.assets.find(x => x.id === b.dataset.genAsset);
+          if (a) genAssetImage(p, a);
+        }));
+        viewRoot.querySelectorAll('[data-gen-simg]').forEach(b => b.addEventListener('click', () => {
+          const s = sceneById(p, b.dataset.genSimg);
+          if (s) genSceneImage(p, s);
+        }));
+        viewRoot.querySelectorAll('[data-gen-svid]').forEach(b => b.addEventListener('click', () => {
+          const s = sceneById(p, b.dataset.genSvid);
+          if (s) genSceneVideo(p, s);
+        }));
+        on('pipeFinish', async () => { await saveProjectPatch(p, { stage: 'done' }, { stage: 'done' }); toast('流水线完成 — 去「场景」页看成片'); state.tab = 'scenes'; renderWorkspace(); });
+      }
+
+      /* ---------- 资产标签页 ---------- */
+      function renderAssetsView() {
+        const p = getProject();
+        const groups = ['character', 'environment', 'prop'].map(kind => {
+          const list = p.assets.filter(a => a.kind === kind);
+          if (!list.length) return '';
+          return `<h3 style="margin:18px 0 0;font-size:13px">${KIND_CN[kind]} <span class="gk">${list.length}</span></h3>
+            <div class="asset-grid">${list.map(a => {
+              const open = state.assetOpen === a.id;
+              return `<div class="asset-card">
+                <span class="g-thumb">${a.primarySrc ? `<img src="${esc(a.primarySrc)}" alt="" />` : '<span class="g-ph">待生成</span>'}</span>
+                <span class="asset-kind">${esc(a.refKey)}</span>
+                <h4>${esc(a.name)}</h4>
+                <p class="pipe-hint" style="margin:2px 0 0">${esc(trunc(a.descr, 42))}</p>
+                <div class="asset-foot">
+                  ${statusWord(a.status)}
+                  <span style="flex:1"></span>
+                  <button class="pill sm" type="button" data-gen-asset="${a.id}">${state.busy[`a:${a.id}`] ? '生成中…' : '生成'}</button>
+                  <button class="mini-link" type="button" data-asset-open="${a.id}">${open ? '收起' : '详情'}</button>
+                </div>
+                ${open ? `<div class="asset-expand">
+                  <div class="asset-files">${a.files.map(f => `<button type="button" class="${f.id === a.primaryFileId ? 'primary' : ''}" data-asset-primary="${a.id}:${f.id}" title="${esc(f.label)}（点击设为主图）"><img src="${esc(f.src || '')}" alt="" /></button>`).join('') || '<span class="pipe-hint">还没有图</span>'}</div>
+                  <textarea class="pipe-ta" style="min-height:90px;margin-top:9px;font-size:11px" data-asset-prompt="${a.id}">${esc(a.prompt)}</textarea>
+                  <div class="pipe-actions" style="margin-top:8px">
+                    <button class="pill sm" type="button" data-asset-saveprompt="${a.id}">保存提示词</button>
+                    <span style="flex:1"></span>
+                    <button class="st-linkbtn danger" type="button" data-asset-del="${a.id}">删除资产</button>
+                  </div>
+                </div>` : ''}
+              </div>`;
+            }).join('')}</div>`;
+        }).join('');
+        viewRoot.innerHTML = `<div class="view-head"><h2>数字资产</h2><span class="gk">ASSETS / ${p.assets.length}</span>${legendHTML()}</div>
+          ${p.assets.length ? groups : '<div class="ws-empty"><h2>还没有数字资产</h2>在「AI 流水线」的第 4 步生成分镜时，会自动列出全片需要的角色、环境与道具。</div>'}`;
+        viewRoot.querySelectorAll('[data-gen-asset]').forEach(b => b.addEventListener('click', () => {
+          const a = p.assets.find(x => x.id === b.dataset.genAsset);
+          if (a) genAssetImage(p, a);
+        }));
+        viewRoot.querySelectorAll('[data-asset-open]').forEach(b => b.addEventListener('click', () => {
+          state.assetOpen = state.assetOpen === b.dataset.assetOpen ? null : b.dataset.assetOpen;
+          renderWorkspace();
+        }));
+        viewRoot.querySelectorAll('[data-asset-primary]').forEach(b => b.addEventListener('click', () => {
+          const [aid, fid] = b.dataset.assetPrimary.split(':');
+          const a = p.assets.find(x => x.id === aid);
+          if (a) setAssetPrimary(p, a, fid);
+        }));
+        viewRoot.querySelectorAll('[data-asset-saveprompt]').forEach(b => b.addEventListener('click', async () => {
+          const a = p.assets.find(x => x.id === b.dataset.assetSaveprompt);
+          const ta = viewRoot.querySelector(`[data-asset-prompt="${b.dataset.assetSaveprompt}"]`);
+          if (a && ta) { await saveAssetPrompt(p, a, ta.value.trim()); toast('提示词已保存'); }
+        }));
+        viewRoot.querySelectorAll('[data-asset-del]').forEach(b => b.addEventListener('click', () => {
+          const a = p.assets.find(x => x.id === b.dataset.assetDel);
+          if (a) armOr(b, '确认删除', () => deleteAssetRow(p, a));
+        }));
+      }
+
+
+      /* ---------- 渲染（与本地版一致的放映间 UI） ---------- */
+      const dot = s => `<i class="st-dot ${s ? STATUS[s].cls : 's-none'}" title="${s ? esc(STATUS[s].label) : '未创建'}"></i>`;
+      const statusWord = s => `<span class="st-word ${STATUS[s].cls}"><i class="st-dot"></i>${STATUS[s].label}</span>`;
+      const avatarHTML = (user, sm) => {
+        const t = `${esc(user.name)} · ${esc(ROLE_LABEL[user.role] || '')}`;
+        return user.avatarUrl
+          ? `<span class="st-avatar${sm ? ' sm' : ''} has-img" title="${t}"><img src="${esc(user.avatarUrl)}" alt="" /></span>`
+          : `<span class="st-avatar${sm ? ' sm' : ''}" style="background:${esc(user.color)}" title="${t}">${esc(user.short)}</span>`;
+      };
+      const whoLine = item => { const u = userById(item.ownerId); return `<span class="who">${avatarHTML(u, true)}<strong>${esc(u.name)}</strong></span>`; };
+      const legendHTML = () => `<span class="sec-legend">${['done', 'doing', 'review', 'todo'].map(statusWord).join('')}</span>`;
+      function armOr(btn, armedText, fn) {
+        if (btn.dataset.armed) { delete btn.dataset.armed; fn(); return; }
+        btn.dataset.armed = '1';
+        const original = btn.textContent;
+        btn.textContent = armedText;
+        setTimeout(() => { if (btn.isConnected && btn.dataset.armed) { delete btn.dataset.armed; btn.textContent = original; } }, 3200);
+      }
+
+      function renderTopbar() {
+        const p = getProject();
+        const topic = p ? topicById(p.topicId) : null;
+        crumb.textContent = p ? `${topic ? topic.name : '未分类'} · ${p.scenes.length} 个场景 · ${p.items.length} 项内容` : '';
+        const me = curUser();
+        barUser.innerHTML = `${avatarHTML(me)}<span>${esc(me.name)}</span>`;
+      }
+
+      function renderSidebar() {
+        projCount.textContent = String(db.projects.length);
+        const sorted = [...db.projects].sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+        projectList.innerHTML = sorted.length ? sorted.map(p => {
+          const topic = topicById(p.topicId);
+          const r = doneRatio(p);
+          const pct = r.total ? Math.round(r.done / r.total * 100) : 0;
+          return `<div class="proj-card${p.id === state.projectId ? ' active' : ''}" data-proj="${p.id}" role="button" tabindex="0">
+            <span class="proj-line"><strong>${esc(p.title)}</strong><button class="proj-del" type="button" data-del-proj="${p.id}" aria-label="删除项目 ${esc(p.title)}">×</button></span>
+            <span class="proj-meta">${esc(topic ? topic.name : '未分类')} · ${esc(p.status)} · ${r.done}/${r.total} · ${esc(fmtRel(p.updatedAt))}</span>
+            <span class="proj-bar"><i style="width:${pct}%"></i></span>
+          </div>`;
+        }).join('') : '<p class="topic-help" style="margin:4px 0 6px">还没有项目，在下方从主题新建第一个。</p>';
+        projectList.querySelectorAll('[data-proj]').forEach(card => {
+          card.addEventListener('click', e => { if (e.target.closest('.proj-del')) return; openProject(card.dataset.proj); });
+          card.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target === card) openProject(card.dataset.proj); });
+        });
+        projectList.querySelectorAll('[data-del-proj]').forEach(btn => btn.addEventListener('click', e => {
+          e.stopPropagation();
+          const target = db.projects.find(x => x.id === btn.dataset.delProj);
+          armOr(btn, '删除？', () => {
+            const name = target ? target.title : '';
+            deleteProject(btn.dataset.delProj);
+            renderAll();
+            toast(`已删除项目「${name}」`);
+          });
+        }));
+        crewLines.textContent = db.users.length ? `成员：${db.users.map(u => `${u.name} ${SHORT_ROLE[u.role] || ''}`).join(' · ')}` : '';
+        const me = curUser();
+        if (document.activeElement !== el('meName')) el('meName').value = me.name || '';
+        el('meRole').value = me.role || 'script';
+        const avPrev = el('meAvatarPreview');
+        if (avPrev) {
+          avPrev.style.background = me.avatarUrl ? '#e9e5db' : (me.color || '#4d718f');
+          avPrev.innerHTML = me.avatarUrl ? `<img src="${esc(me.avatarUrl)}" alt="" />` : esc(me.short || '?');
+        }
+        const avClear = el('meAvatarClear');
+        if (avClear) avClear.hidden = !me.avatarPath;
+        const avBtn = el('meAvatarBtn');
+        if (avBtn) avBtn.textContent = me.avatarPath ? '更换头像' : '上传头像';
+        modelGroups.innerHTML = ['text', 'image', 'video'].map(k => `<p class="mk-kind">${KIND_LABEL[k]}模型</p><div class="mk-chips">${modelsOf(k).map(m => `<span class="mk-chip">${esc(m.name)}<button type="button" data-del-model="${m.id}" aria-label="删除 ${esc(m.name)}">×</button></span>`).join('') || '<span style="color:#a49c8e;font-size:10px">暂无，先添加</span>'}</div>`).join('');
+        modelGroups.querySelectorAll('[data-del-model]').forEach(btn => btn.addEventListener('click', () => {
+          armOr(btn, '确认', () => { deleteModel(btn.dataset.delModel); renderSidebar(); renderInspector(); });
+        }));
+        const mc = el('modelCount');
+        if (mc) mc.textContent = `${db.models.length} 个`;
+        renderTopicSelect();
+      }
+      function renderTopicSelect() {
+        const withContent = new Set(db.projects.map(p => p.topicId));
+        const opt = c => `<option value="${c.id}">${String(c.id).padStart(2, '0')} · ${esc(c.name)}${withContent.has(c.id) ? '（已有项目）' : ''}</option>`;
+        const hot = categories.filter(c => withContent.has(c.id));
+        const rest = categories.filter(c => !withContent.has(c.id));
+        const prev = topicSelect.value;
+        topicSelect.innerHTML =
+          (hot.length ? `<optgroup label="已有内容的主题">${hot.map(opt).join('')}</optgroup>` : '') +
+          `<optgroup label="全部主题">${rest.map(opt).join('')}</optgroup>`;
+        if (prev && [...topicSelect.options].some(o => o.value === prev)) topicSelect.value = prev;
+      }
+
+      function renderWorkspace() {
+        const p = getProject();
+        if (!p) {
+          projectHead.innerHTML = '';
+          viewTabs.innerHTML = '';
+          viewRoot.innerHTML = '<div class="ws-empty" style="margin-top:26px"><h2>还没有项目</h2>点左上 ☰ 打开抽屉，从 42 个主题里新建第一个项目；同事登录后会实时看到同一份内容。</div>';
+          return;
+        }
+        const topic = topicById(p.topicId);
+        const r = doneRatio(p);
+        projectHead.innerHTML = `<header class="proj-strip">
+          <div class="ps-lead">
+            <h1 class="ps-title">${esc(p.title)}</h1>
+            <p class="ps-sub">${esc(topic ? topic.name : '未分类')} · ${esc(p.meta)} · <span class="gk">创建 ${esc(fmtAbs(p.createdAt))} · 更新 ${esc(fmtRel(p.updatedAt))}</span></p>
+          </div>
+          <div class="ps-side">
+            <span class="ps-progress">${r.done}<i> / ${r.total} 完成</i></span>
+            <select class="pill-select" id="projectStatusSel" aria-label="项目状态">${PROJECT_STATUS.map(s => `<option${s === p.status ? ' selected' : ''}>${s}</option>`).join('')}</select>
+            <span class="people">${(p.members || []).map(m => avatarHTML(userById(m.userId))).join('')}</span>
+          </div>
+        </header>`;
+        projectHead.querySelector('#projectStatusSel').addEventListener('change', e => {
+          p.status = e.target.value;
+          touchLocal(p, null);
+          cw(sb.from('projects').update({ status: p.status, updated_at: p.updatedAt }).eq('id', p.id), '更新状态');
+          renderSidebar();
+        });
+        const tabs = [
+          ['scenes', '场景', p.scenes.length],
+          ['script', '脚本', itemsOf(p, 'script').length],
+          ['images', '图片', itemsOf(p, 'image').length],
+          ['videos', '视频片段', itemsOf(p, 'video').length],
+          ['copy', '文案版本', itemsOf(p, 'copy').reduce((n, i) => n + i.versions.length, 0)],
+          ['assets', '资产', p.assets.length],
+          ['pipeline', 'AI 流水线', p.stage === 'done' ? '✓' : `${stageIdx(p.stage || 'topic') + 1}/5`]
+        ];
+        viewTabs.innerHTML = tabs.map(([key, label, count]) => `<button type="button" class="${state.tab === key ? 'active' : ''}" data-tab="${key}">${label}<span class="cnt">${count}</span></button>`).join('');
+        viewTabs.querySelectorAll('[data-tab]').forEach(btn => btn.addEventListener('click', () => { state.tab = btn.dataset.tab; renderWorkspace(); }));
+        const views = { scenes: renderScenesView, script: renderScriptView, images: renderImagesView, videos: renderVideosView, copy: renderCopyView, assets: renderAssetsView, pipeline: renderPipelineView };
+        views[state.tab]();
+        bindItemCards();
+      }
+
+      /* ---------- 场景视图 ---------- */
+      function stageEntry(p, scene) {
+        const kinds = {
+          script: itemsOf(p, 'script')[0] || null,
+          image: sceneItem(p, 'image', scene.id) || null,
+          video: sceneItem(p, 'video', scene.id) || null
+        };
+        let kind = state.stageKind;
+        if (!kinds[kind]) kind = kinds.image ? 'image' : (kinds.script ? 'script' : (kinds.video ? 'video' : null));
+        return { kind, kinds, item: kind ? kinds[kind] : null };
+      }
+      function sceneAddFormHTML(visible) {
+        return `<form class="scene-add" id="sceneAddForm"${visible ? '' : ' hidden'}>
+          <input class="st-input" id="sceneTitleInput" placeholder="场景标题，如：黑箱" required />
+          <input class="st-input" id="sceneTimeInput" placeholder="时间码，如 00:00-00:18（可空）" />
+          <button class="pill solid" type="submit">添加场景</button>
+        </form>`;
+      }
+      function renderScenesView() {
+        const p = getProject();
+        if (!p.scenes.length) {
+          viewRoot.innerHTML = `<div class="ws-empty"><h2>还没有分场景</h2>先在「脚本」里确定内容边界，再回到这里添加场景；每个场景会自动生成画面与视频任务。</div>${sceneAddFormHTML(true)}`;
+          bindSceneAdd();
+          return;
+        }
+        if (!state.sceneId || !sceneById(p, state.sceneId)) state.sceneId = p.scenes[0].id;
+        const scene = sceneById(p, state.sceneId);
+        const no = sceneNo(p, state.sceneId);
+        const entry = stageEntry(p, scene);
+        const item = entry.item;
+        const timeDisp = scene.time ? scene.time.replace('-', ' — ') : '时间码待定';
+        const chip = (kind, label) => {
+          const it = entry.kinds[kind];
+          if (!it) return `<button type="button" class="prod-chip mk" data-mk="${kind}" data-scene="${scene.id}">＋ ${label}</button>`;
+          return `<button type="button" class="prod-chip${entry.kind === kind ? ' active' : ''}" data-stage="${kind}">${dot(it.status)}${label}</button>`;
+        };
+        let stageInner = '<div class="stage-ph">这个场景还没有内容。</div>';
+        let capL = '', capR = '';
+        if (item) {
+          const lastVer = item.versions.length ? item.versions[item.versions.length - 1] : null;
+          capL = `${TYPE_LABEL[item.type]} · ${item.title}${lastVer ? ` — v${lastVer.v} ${trunc(lastVer.note, 14)}` : ''} · ${item.model.name}`;
+          capR = `${whoLine(item)}${statusWord(item.status)}`;
+          if (entry.kind === 'image') {
+            const src = currentSrc(item);
+            stageInner = src ? `<img src="${esc(src)}" alt="${esc(item.title)}" />` : '<div class="stage-ph">画面尚未生成。写好提示词、选好模型，生成后在详情里上传结果。</div>';
+          } else if (entry.kind === 'script') {
+            const rows = ['action|动作', 'visual|画面', 'sound|声音', 'edit|剪辑'].map(pair => {
+              const [key, label] = pair.split('|');
+              return scene[key] ? `<div><b>${label}</b><span>${esc(scene[key])}</span></div>` : '';
+            }).join('');
+            stageInner = rows ? `<div class="stage-doc">${rows}</div>` : '<div class="stage-ph">尚未填写本场景的分镜内容。</div>';
+          } else {
+            const own = currentSrc(item);
+            if (own && isVideoFile(own)) stageInner = `<video src="${esc(own)}" controls preload="metadata"></video>`;
+            else if (own) stageInner = `<img src="${esc(own)}" alt="${esc(item.title)}" />`;
+            else {
+              const refSrc = currentSrc(entry.kinds.image);
+              stageInner = refSrc
+                ? `<img src="${esc(refSrc)}" alt="首帧参考" /><span class="stage-overlay">▶ 视频待生成 · 底图为首帧参考</span>`
+                : '<div class="stage-ph">视频尚未生成，也还没有可用的首帧场景图。</div>';
+            }
+          }
+        }
+        viewRoot.innerHTML = `
+          <div class="stage-row">
+            <div class="stage-info">
+              <p class="k-scene">SCENE ${String(no).padStart(2, '0')} / ${String(p.scenes.length).padStart(2, '0')}</p>
+              <p class="k-time">${esc(timeDisp)}</p>
+              <h2 class="k-title">${esc(scene.title)}</h2>
+              ${scene.action ? `<p class="k-action">${esc(scene.action)}</p>` : '<p class="k-action">尚未填写场景动作描述。</p>'}
+              ${scene.sound || scene.edit ? `<div class="k-extra">${scene.sound ? `<div><b>声音</b><span>${esc(scene.sound)}</span></div>` : ''}${scene.edit ? `<div><b>剪辑</b><span>${esc(scene.edit)}</span></div>` : ''}</div>` : ''}
+              ${item ? `<div class="k-btns">
+                <button class="pill" type="button" data-quick="prompt" data-item-id="${item.id}">提示词</button>
+                <button class="pill" type="button" data-quick="model" data-item-id="${item.id}">模型</button>
+                <button class="pill" type="button" data-quick="versions" data-item-id="${item.id}">版本 <span class="gk">${item.versions.length}</span></button>
+                <button class="pill" type="button" data-quick="comments" data-item-id="${item.id}">评论 <span class="gk">${item.comments.filter(c => !c.sys).length}</span></button>
+              </div>` : ''}
+              <button class="st-linkbtn danger" type="button" id="delSceneBtn" style="margin-top:10px">删除本场景（含画面与视频任务）</button>
+            </div>
+            <div class="stage-col">
+              <div class="prod-chips">${chip('script', '剧本')}${chip('image', '画面')}${chip('video', '视频')}</div>
+              <div class="stage${item ? ' is-item' : ''}${entry.kind === 'video' ? ' is-video' : ''}"${item ? ` data-stage-item="${item.id}" role="button" tabindex="0" aria-label="打开详情"` : ''}>${stageInner}</div>
+              ${item ? `<div class="stage-cap"><span class="stage-cap-l">${esc(capL)}</span><span class="stage-cap-r">${capR}</span></div>` : ''}
+            </div>
+          </div>
+          <div class="filmstrip">${p.scenes.map((s, i) => {
+            const imgIt = sceneItem(p, 'image', s.id);
+            const src = currentSrc(imgIt);
+            const phText = !imgIt ? '未创建' : (imgIt.status === 'doing' ? '生成中' : '待生成');
+            return `<button type="button" class="cell${s.id === state.sceneId ? ' active' : ''}" data-scene="${s.id}">
+              <span class="cell-thumb">${src ? `<img src="${esc(src)}" alt="${esc(s.title)}" loading="lazy" />` : `<span class="cell-ph">${phText}</span>`}</span>
+              <span class="cell-cap">${dot(imgIt ? imgIt.status : null)}S${String(i + 1).padStart(2, '0')} ${esc(trunc(s.title, 6))}<em>${s.time ? esc(s.time.split('-')[0]) : '--:--'}</em></span>
+            </button>`;
+          }).join('')}<button type="button" class="cell add" id="sceneAddToggle"><span class="cell-thumb">＋ 场景</span></button></div>
+          ${sceneAddFormHTML(false)}`;
+        viewRoot.querySelectorAll('.cell[data-scene]').forEach(cellBtn => cellBtn.addEventListener('click', () => {
+          state.sceneId = cellBtn.dataset.scene;
+          state.stageKind = 'image';
+          const sc = sceneById(p, state.sceneId);
+          const e2 = stageEntry(p, sc);
+          state.sel = e2.item ? e2.item.id : null;
+          state.selVersion = null;
+          renderWorkspace(); renderInspector();
+        }));
+        viewRoot.querySelectorAll('[data-stage]').forEach(btn => btn.addEventListener('click', () => {
+          state.stageKind = btn.dataset.stage;
+          const e2 = stageEntry(p, scene);
+          state.sel = e2.item ? e2.item.id : null;
+          state.selVersion = null;
+          renderWorkspace(); renderInspector();
+        }));
+        const stageEl = viewRoot.querySelector('[data-stage-item]');
+        if (stageEl) {
+          stageEl.addEventListener('click', e => { if (e.target.tagName !== 'VIDEO') selectItem(stageEl.dataset.stageItem); });
+          stageEl.addEventListener('keydown', e => { if (e.key === 'Enter') selectItem(stageEl.dataset.stageItem); });
+        }
+        const delSceneBtn = el('delSceneBtn');
+        if (delSceneBtn) delSceneBtn.addEventListener('click', () => armOr(delSceneBtn, '再点一次确认删除本场景', async () => {
+          delSceneBtn.disabled = true;
+          const ok = await deleteScene(p, scene.id);
+          if (ok) renderAll();
+          else delSceneBtn.disabled = false;
+        }));
+        const toggle = el('sceneAddToggle');
+        if (toggle) toggle.addEventListener('click', () => { const f = el('sceneAddForm'); f.hidden = !f.hidden; if (!f.hidden) el('sceneTitleInput').focus(); });
+        bindSceneAdd();
+      }
+      function bindSceneAdd() {
+        const form = el('sceneAddForm');
+        if (!form) return;
+        form.addEventListener('submit', async e => {
+          e.preventDefault();
+          const p = getProject();
+          if (!p) return;
+          const submitBtn = form.querySelector('button[type="submit"]');
+          submitBtn.disabled = true;
+          submitBtn.textContent = '添加中…';
+          const sceneId = await addScene(p, el('sceneTitleInput').value.trim(), el('sceneTimeInput').value.trim());
+          submitBtn.disabled = false;
+          if (!sceneId) { renderAll(); return; }
+          state.sceneId = sceneId;
+          state.stageKind = 'image';
+          renderAll();
+        });
+      }
+
+      /* ---------- 脚本视图 ---------- */
+      function renderScriptView() {
+        const p = getProject();
+        const scriptIt = itemsOf(p, 'script')[0];
+        const rows = s => ['action|动作', 'visual|画面', 'sound|声音', 'edit|剪辑'].map(pair => {
+          const [key, label] = pair.split('|');
+          return s[key] ? `<p class="sp-row"><b>${label}</b>${esc(s[key])}</p>` : '';
+        }).join('');
+        viewRoot.innerHTML = `
+          ${scriptIt ? `<div class="doc-head" data-item="${scriptIt.id}" tabindex="0" role="button">
+            <h2>${esc(scriptIt.title)}</h2>
+            ${statusWord(scriptIt.status)}
+            ${whoLine(scriptIt)}
+            <span class="byline-mono">${esc(scriptIt.model.name)} · 更新${esc(fmtRel(scriptIt.updatedAt))} · 版本 ${scriptIt.versions.length}</span>
+            <button class="pill sm" type="button" data-quick="prompt" data-item-id="${scriptIt.id}">提示词</button>
+            <button class="pill sm" type="button" data-quick="model" data-item-id="${scriptIt.id}">模型</button>
+          </div>` : '<div class="ws-empty"><h2>还没有脚本任务</h2></div>'}
+          ${p.scenes.length ? `<ol class="screenplay">${p.scenes.map((s, i) => `<li class="sp-scene"><p class="sp-tc">S${String(i + 1).padStart(2, '0')}<em>${esc(s.time ? s.time.replace('-', ' — ') : '')}</em></p><div><h3>${esc(s.title)}</h3>${rows(s) || '<p class="sp-row">尚未填写场景内容。</p>'}</div></li>`).join('')}</ol>` : '<div class="ws-empty"><h2>脚本还没有分场景</h2>在「场景」页添加场景后，这里会按时间码展示完整分镜。</div>'}`;
+      }
+
+      /* ---------- 图片视图 ---------- */
+      function renderImagesView() {
+        const p = getProject();
+        const imgs = itemsOf(p, 'image');
+        const sceneRef = it => it.sceneId ? `S${String(sceneNo(p, it.sceneId)).padStart(2, '0')}` : '通用素材';
+        viewRoot.innerHTML = `<div class="view-head"><h2>图片</h2><span class="gk">PLATES / ${imgs.length}</span>${legendHTML()}</div>
+          ${imgs.length ? `<div class="gal">${imgs.map(it => {
+            const src = currentSrc(it);
+            return `<button type="button" class="g-card${it.id === state.sel ? ' selected' : ''}" data-item="${it.id}" aria-label="${esc(it.title)}">
+              <span class="g-thumb">${src ? `<img src="${esc(src)}" alt="${esc(it.title)}" loading="lazy" />` : '<span class="g-ph">待生成</span>'}</span>
+              <span class="g-cap">
+                <span class="g-cap1">${esc(sceneRef(it))} · ${esc(it.model.name)} · 版本 ${it.versions.length} · 更新${esc(fmtRel(it.updatedAt))}</span>
+                <span class="g-cap2">${esc(it.title)}</span>
+                <span class="g-cap3">${statusWord(it.status)}${whoLine(it)}</span>
+              </span>
+            </button>`;
+          }).join('')}</div>` : '<div class="ws-empty"><h2>还没有画面素材</h2>在「场景」页为具体场景创建画面任务。</div>'}`;
+      }
+
+      /* ---------- 视频视图 ---------- */
+      function renderVideosView() {
+        const p = getProject();
+        const vids = itemsOf(p, 'video');
+        viewRoot.innerHTML = `<div class="view-head"><h2>视频片段</h2><span class="gk">SHOTS / ${vids.length}</span>${legendHTML()}</div>
+          ${vids.length ? `<div class="v-rows">${vids.map(it => {
+            const own = currentSrc(it);
+            const refSrc = own || (it.sceneId ? currentSrc(sceneItem(p, 'image', it.sceneId)) : null);
+            return `<button type="button" class="v-row${it.id === state.sel ? ' selected' : ''}" data-item="${it.id}">
+              <span class="v-no">${it.sceneId ? `S${String(sceneNo(p, it.sceneId)).padStart(2, '0')}` : '--'}</span>
+              <span class="v-thumb">${refSrc && !isVideoFile(refSrc) ? `<img src="${esc(refSrc)}" alt="参考帧" loading="lazy" />` : (refSrc ? '<span class="g-ph">▶ 已有成片</span>' : '<span class="g-ph">无首帧</span>')}</span>
+              <span class="v-main"><span class="v-title">${esc(it.title)}</span><span class="v-sub">${esc(it.model.name)} · ${esc(userById(it.ownerId).name)} 负责 · 更新${esc(fmtRel(it.updatedAt))}</span></span>
+              ${statusWord(it.status)}
+              <span class="mini-link" data-quick="prompt" data-item-id="${it.id}">提示词</span>
+            </button>`;
+          }).join('')}</div>` : '<div class="ws-empty"><h2>还没有视频任务</h2>在「场景」页为具体场景创建视频任务。</div>'}`;
+      }
+
+      /* ---------- 文案版本视图 ---------- */
+      function renderCopyView() {
+        const p = getProject();
+        const copies = itemsOf(p, 'copy');
+        if (!copies.length) {
+          viewRoot.innerHTML = `<div class="view-head"><h2>文案版本</h2><span class="gk">COPY / 0</span></div>
+            <div class="ws-empty"><h2>还没有发布文案</h2>为项目创建一份发布文案，标题与简介的每一版都会留在版本记录里。<br><br><button class="pill solid" type="button" id="mkCopyBtn">新建发布文案</button></div>`;
+          el('mkCopyBtn').addEventListener('click', async () => {
+            const button = el('mkCopyBtn');
+            button.disabled = true;
+            button.textContent = '创建中…';
+            const item = await mkCopyItem(p);
+            if (!item) { renderAll(); return; }
+            state.tab = 'copy'; state.sel = item.id; renderAll();
+          });
+          return;
+        }
+        viewRoot.innerHTML = `<div class="view-head"><h2>文案版本</h2><span class="gk">COPY / ${copies.reduce((n, i) => n + i.versions.length, 0)}</span></div>` + copies.map(it => {
+          const viewing = it.versions.find(v => v.v === state.selVersion && it.id === state.sel) || it.versions[it.versions.length - 1];
+          return `<section class="copy-wrap" data-copy="${it.id}">
+            <div class="doc-head" data-item="${it.id}" tabindex="0" role="button">
+              <h2>${esc(it.title)}</h2>
+              ${statusWord(it.status)}
+              ${whoLine(it)}
+              <span class="byline-mono">${esc(it.model.name)} · 更新${esc(fmtRel(it.updatedAt))}</span>
+              <button class="pill sm" type="button" data-quick="detail" data-item-id="${it.id}">详情 / 评论</button>
+            </div>
+            ${it.versions.length ? `<div class="ver-chips">${it.versions.map(v => `<button type="button" class="ver-chip${v.v === it.versions.length ? ' cur' : ''}${viewing && v.v === viewing.v ? ' viewing' : ''}" data-copy-ver="${v.v}" data-item-id="${it.id}">v${v.v}${v.v === it.versions.length ? ' · 当前' : ''}</button>`).join('')}</div>
+            <div class="copy-page">${esc(viewing.body || '')}</div>
+            <p class="copy-caption">正在查看：v${viewing.v} · ${esc(viewing.note)}${viewing.model ? ` · ${esc(viewing.model)}` : ''} · ${esc(userById(viewing.by).name)} · ${esc(fmtAbs(viewing.at))}</p>` : '<div class="copy-page">还没有文案版本，在下方写第一版。</div>'}
+            <form class="copy-new" data-item-id="${it.id}">
+              <input class="st-input" name="note" placeholder="版本说明，如：收紧标题（可空）" />
+              <textarea name="body" placeholder="标题：…&#10;简介：…&#10;话题：#…" required></textarea>
+              <button class="pill solid" type="submit">存为 v${it.versions.length + 1}</button>
+            </form>
+          </section>`;
+        }).join('');
+        viewRoot.querySelectorAll('[data-copy-ver]').forEach(btn => btn.addEventListener('click', () => {
+          state.sel = btn.dataset.itemId;
+          state.selVersion = Number(btn.dataset.copyVer);
+          renderWorkspace(); renderInspector();
+        }));
+        viewRoot.querySelectorAll('form.copy-new').forEach(form => form.addEventListener('submit', async e => {
+          e.preventDefault();
+          const item = itemById(p, form.dataset.itemId);
+          const body = form.body.value.trim();
+          if (!item || !body) return;
+          const submitBtn = form.querySelector('button[type="submit"]');
+          submitBtn.disabled = true;
+          submitBtn.textContent = '保存中…';
+          const ok = await addCopyVersion(p, item, form.note.value.trim(), body);
+          if (!ok) { renderAll(); return; }
+          state.sel = item.id; state.selVersion = null;
+          renderAll();
+        }));
+      }
+
+      /* ---------- 通用绑定 ---------- */
+      function bindItemCards() {
+        viewRoot.querySelectorAll('[data-item]').forEach(card => {
+          card.addEventListener('click', e => {
+            if (e.target.closest('.mini-link') || e.target.closest('.pill')) return;
+            selectItem(card.dataset.item);
+          });
+          card.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target === card) selectItem(card.dataset.item); });
+        });
+        viewRoot.querySelectorAll('[data-quick]').forEach(btn => btn.addEventListener('click', e => {
+          e.stopPropagation();
+          selectItem(btn.dataset.itemId, btn.dataset.quick === 'detail' ? null : btn.dataset.quick);
+        }));
+        viewRoot.querySelectorAll('[data-mk]').forEach(btn => btn.addEventListener('click', async e => {
+          e.stopPropagation();
+          const p = getProject();
+          if (!p) return;
+          const scene = sceneById(p, btn.dataset.scene);
+          btn.disabled = true;
+          const item = await insertTaskItem(p, btn.dataset.mk, btn.dataset.scene, scene ? scene.title : '场景');
+          if (!item) { renderAll(); return; }
+          p.items.push(item);
+          touchLocal(p, item);
+          cw(sb.from('projects').update({ updated_at: p.updatedAt }).eq('id', p.id));
+          state.sel = item.id;
+          if (btn.dataset.mk === 'image' || btn.dataset.mk === 'video') state.stageKind = btn.dataset.mk;
+          renderAll();
+        }));
+      }
+
+      /* ---------- 详情抽屉 ---------- */
+      function modelText(item) {
+        const gen = item.versions.length ? item.versions[item.versions.length - 1] : null;
+        return `模型：${item.model.name}\n模式：${item.model.mode}\n参考：${item.model.refs}${gen ? `\n最近生成：v${gen.v} · ${fmtAbs(gen.at)} · ${userById(gen.by).name}${gen.model ? ` · ${gen.model}` : ''}` : '\n最近生成：暂无记录'}`;
+      }
+      function inspectorCap(refText) {
+        return `<div class="ins-cap"><p>${esc(refText)}</p><button class="ins-close" type="button" id="insClose" aria-label="关闭">×</button></div>`;
+      }
+      function renderInspector(focusSec) {
+        const changedItem = renderInspector._last !== state.sel;
+        renderInspector._last = state.sel;
+        if (changedItem && !focusSec) state.insTab = 'info';
+        if (focusSec) state.insTab = (focusSec === 'prompt' || focusSec === 'model') ? 'gen' : (focusSec === 'versions' ? 'vers' : (focusSec === 'comments' ? 'cmts' : 'info'));
+        if (!['info', 'gen', 'vers', 'cmts'].includes(state.insTab)) state.insTab = 'info';
+        const p = getProject();
+        const item = p && state.sel ? itemById(p, state.sel) : null;
+        if (!item) {
+          inspector.innerHTML = `${inspectorCap('内容详情')}
+            <h3 class="ins-title">选择一项内容</h3>
+            <p class="ins-desc">点击任意剧本、画面、视频或文案条目，这里会分页展示它的详情、生成设置、版本记录与评论。</p>
+            <div class="ins-rows">
+              <div class="ins-row"><span>生成流程</span><strong>写提示词 → 选模型 → 生成 → 上传登记</strong></div>
+              <div class="ins-row"><span>版本快照</span><strong>登记时保存当时的提示词与模型</strong></div>
+            </div>`;
+          bindInspectorCommon();
+          return;
+        }
+        const kind = KIND_OF_TYPE[item.type];
+        const scene = item.sceneId ? sceneById(p, item.sceneId) : null;
+        const no = item.sceneId ? sceneNo(p, item.sceneId) : null;
+        const viewingVer = state.selVersion ? item.versions.find(v => v.v === state.selVersion) : null;
+        let preview = '';
+        if (item.type === 'copy') {
+          const body = (viewingVer || item.versions[item.versions.length - 1] || {}).body;
+          preview = body ? `<div class="ins-preview"><pre class="ins-pre">${esc(body)}</pre></div>` : '<div class="ins-preview"><div class="ph">还没有文案版本。</div></div>';
+        } else if (item.type === 'video') {
+          const own = viewingVer && viewingVer.src ? viewingVer.src : currentSrc(item);
+          if (own && isVideoFile(own)) {
+            preview = `<div class="ins-preview"><video src="${esc(own)}" controls preload="metadata"></video></div>${viewingVer ? `<span class="ins-badge">正在查看 v${viewingVer.v} · ${esc(viewingVer.note)}</span>` : ''}`;
+          } else if (own) {
+            preview = `<div class="ins-preview"><img src="${esc(own)}" alt="${esc(item.title)}" /></div>${viewingVer ? `<span class="ins-badge">正在查看 v${viewingVer.v} · ${esc(viewingVer.note)}</span>` : ''}`;
+          } else {
+            const refImg = scene ? sceneItem(p, 'image', scene.id) : null;
+            const refSrc = currentSrc(refImg);
+            preview = refSrc
+              ? `<div class="ins-preview"><img src="${esc(refSrc)}" alt="首帧参考" style="opacity:.82" /></div><span class="ins-badge">视频待生成 — 上图为首帧参考</span>`
+              : '<div class="ins-preview"><div class="ph">视频尚未生成。生成后在「生成」页上传结果文件。</div></div>';
+          }
+        } else if (item.type === 'image') {
+          const src = viewingVer && viewingVer.src ? viewingVer.src : currentSrc(item);
+          preview = src
+            ? `<div class="ins-preview"><img src="${esc(src)}" alt="${esc(item.title)}" /></div>${viewingVer ? `<span class="ins-badge">正在查看 v${viewingVer.v} · ${esc(viewingVer.note)}</span>` : ''}`
+            : '<div class="ins-preview"><div class="ph">画面尚未生成。生成后在「生成」页上传结果文件。</div></div>';
+        }
+        const cmCount = item.comments.filter(c => !c.sys).length;
+        const tabsHTML = `<div class="ins-tabs">
+          <button type="button" class="${state.insTab === 'info' ? 'active' : ''}" data-instab="info">详情</button>
+          <button type="button" class="${state.insTab === 'gen' ? 'active' : ''}" data-instab="gen">生成</button>
+          <button type="button" class="${state.insTab === 'vers' ? 'active' : ''}" data-instab="vers">版本<span class="gk">${item.versions.length}</span></button>
+          <button type="button" class="${state.insTab === 'cmts' ? 'active' : ''}" data-instab="cmts">评论<span class="gk">${cmCount}</span></button>
+        </div>`;
+        let pane = '';
+        if (state.insTab === 'info') {
+          pane = `
+            <p class="ins-desc" style="margin:0 0 11px">${esc(item.desc)}</p>
+            ${preview}
+            <div class="ins-rows" style="margin-top:13px">
+              <div class="ins-row"><span>所属场景</span><strong>${scene ? `S${String(no).padStart(2, '0')} · ${esc(scene.time || scene.title)}` : (item.type === 'script' ? `整片 · ${p.scenes.length} 个场景` : '整个项目')}</strong></div>
+              <div class="ins-row"><span>负责人</span><select id="ownerSel">${db.users.map(u => `<option value="${u.id}"${u.id === item.ownerId ? ' selected' : ''}>${esc(u.name)} · ${esc(ROLE_LABEL[u.role])}</option>`).join('')}</select></div>
+              <div class="ins-row"><span>状态</span><select id="statusSel">${Object.keys(STATUS).map(k => `<option value="${k}"${k === item.status ? ' selected' : ''}>${STATUS[k].label}</option>`).join('')}</select></div>
+              <div class="ins-row"><span>创建时间</span><strong>${esc(fmtAbs(item.createdAt))}</strong></div>
+              <div class="ins-row"><span>最近修改</span><strong>${esc(fmtRel(item.updatedAt))}（${esc(fmtAbs(item.updatedAt))}）</strong></div>
+            </div>
+            <div class="ins-danger"><button class="st-linkbtn danger" type="button" id="delItemBtn">删除此内容（含 ${item.versions.length} 个版本、文件与全部评论）</button></div>`;
+        } else if (state.insTab === 'gen') {
+          const promptSec = state.editPrompt
+            ? `<div class="prompt-edit">
+                <textarea id="promptEditTa">${esc(item.prompt || '')}</textarea>
+                <div class="row"><button class="pill sm" type="button" id="promptCancelBtn">取消</button><button class="pill sm solid" type="button" id="promptSaveBtn">保存提示词</button></div>
+              </div>`
+            : (item.prompt ? `<pre class="ins-pre">${esc(item.prompt)}</pre>` : '<p class="ins-desc" style="margin:0">尚未填写提示词。点「编辑」写第一版。</p>');
+          const modelOptions = (() => {
+            const names = modelsOf(kind).map(m => m.name);
+            const list = names.includes(item.model.name) ? names : [item.model.name, ...names];
+            return list.map(n => `<option value="${esc(n)}"${n === item.model.name ? ' selected' : ''}>${esc(n)}</option>`).join('');
+          })();
+          const registerSec = item.type === 'copy'
+            ? '<p class="ins-desc" style="margin:0">新的文案正文在「文案版本」页撰写并保存，会自动成为新版本。</p>'
+            : `<form class="ver-form" id="verForm" style="margin-top:0;padding-top:0;border-top:0">
+                <input class="st-input" name="note" placeholder="生成说明，如：第 ${item.versions.length + 1} 次生成 · 收紧构图（可空）" />
+                ${kind !== 'text' ? `<label class="file-row"><input type="file" id="verFile" accept="${kind === 'video' ? 'video/*' : 'image/*'}" hidden /><button class="pill sm" type="button" id="verFileBtn">选择${KIND_LABEL[kind]}文件</button><span class="file-name" id="verFileName">未选择（可空）</span></label>` : ''}
+                <button class="pill sm accent" type="submit" id="verSubmitBtn">上传并登记 v${item.versions.length + 1}</button>
+              </form>`;
+          pane = `
+            <section class="ins-sec" data-sec="prompt" style="margin-top:0">
+              <div class="ins-sec-head"><h4>① 精准提示词</h4><span class="ver-actions">${state.editPrompt ? '' : '<button class="mini-link" type="button" id="editPromptBtn">编辑</button>'}<button class="mini-link" type="button" id="copyPromptBtn">复制</button></span></div>
+              ${promptSec}
+            </section>
+            <section class="ins-sec" data-sec="model">
+              <div class="ins-sec-head"><h4>② 模型<span class="gk">${esc(KIND_LABEL[kind])}类</span></h4><button class="mini-link" type="button" id="copyModelBtn">复制</button></div>
+              <div class="ins-rows" style="margin-top:0">
+                <div class="ins-row"><span>模型</span><select id="modelSel">${modelOptions}</select></div>
+                <div class="ins-row"><span>模式</span><input type="text" id="modeInput" value="${esc(item.model.mode)}" /></div>
+                <div class="ins-row"><span>参考</span><input type="text" id="refsInput" value="${esc(item.model.refs)}" /></div>
+              </div>
+            </section>
+            <section class="ins-sec" data-sec="register">
+              <div class="ins-sec-head"><h4>③ 生成后上传登记</h4></div>
+              ${registerSec}
+            </section>`;
+        } else if (state.insTab === 'vers') {
+          const versionsHTML = item.versions.length
+            ? `<ol class="ver-list">${[...item.versions].reverse().map(v => {
+                const clickable = v.src || v.body;
+                const viewing = state.selVersion === v.v;
+                return `<li class="ver-item${viewing ? ' viewing' : ''}">
+                  <div class="ver-line"><span class="ver-tag">v${v.v}</span>${esc(v.note)}${v.v === item.versions.length ? '（当前）' : ''}</div>
+                  <span class="ver-meta">${v.model ? `${esc(v.model)} · ` : ''}${esc(userById(v.by).name)} · ${esc(fmtAbs(v.at))}<span class="ver-actions">${clickable ? `<button class="mini-link" type="button" data-ver="${v.v}">${viewing ? '收起' : '查看'}</button>` : ''}${v.filePath ? `<button class="mini-link ver-dl" type="button" data-dl-ver="${v.v}">下载</button>` : ''}<button class="mini-link ver-del" type="button" data-del-ver="${v.v}">删除</button></span></span>
+                </li>`;
+              }).join('')}</ol>`
+            : '<p class="ins-desc" style="margin:0">暂无版本。生成后在「生成」页上传登记，会快照当时的提示词与模型。</p>';
+          pane = `
+            ${state.selVersion ? `<div style="margin-bottom:12px">${preview}</div>` : ''}
+            <div class="ins-sec-head" style="margin-bottom:8px"><h4>版本记录<span class="gk">${item.versions.length}</span></h4>${state.selVersion ? '<button class="mini-link" type="button" id="backCurrentBtn">回到当前版</button>' : ''}</div>
+            ${versionsHTML}
+            <p style="margin:12px 0 0"><button class="mini-link" type="button" data-instab="gen">＋ 登记新的生成结果</button></p>`;
+        } else {
+          const commentsHTML = item.comments.length
+            ? `<div class="cm-list">${item.comments.map(c => {
+                const u = userById(c.by);
+                return c.sys
+                  ? `<p class="cm-sys"><strong>${esc(u.name)}</strong> ${esc(c.text)} · ${esc(fmtRel(c.at))}</p>`
+                  : `<div class="cm-item">${avatarHTML(u, true)}<div><p class="cm-head"><strong>${esc(u.name)}</strong> · ${esc(fmtRel(c.at))}</p><p>${esc(c.text)}</p></div></div>`;
+              }).join('')}</div>`
+            : '<p class="ins-desc" style="margin:0">还没有评论。</p>';
+          pane = `${commentsHTML}
+            <form class="cm-form" id="commentForm">
+              <textarea placeholder="以 ${esc(curUser().name)} 的身份评论…" required></textarea>
+              <button class="pill sm solid" type="submit">发表评论</button>
+            </form>`;
+        }
+        inspector.innerHTML = `
+          ${inspectorCap(`${TYPE_LABEL[item.type]}${scene ? ` · S${String(no).padStart(2, '0')}` : ''} · ${KIND_LABEL[kind]}生成`)}
+          <h3 class="ins-title">${esc(item.title)}</h3>
+          <div class="ins-byline">${statusWord(item.status)}${whoLine(item)}<span class="byline-mono">更新${esc(fmtRel(item.updatedAt))}</span></div>
+          ${tabsHTML}
+          <div class="ins-pane">${pane}</div>`;
+        inspector.querySelectorAll('[data-instab]').forEach(btn => btn.addEventListener('click', () => { state.insTab = btn.dataset.instab; renderInspector(); }));
+        const ownerSel = inspector.querySelector('#ownerSel');
+        if (ownerSel) ownerSel.addEventListener('change', e => { setOwner(p, item, e.target.value); renderAll(); });
+        const statusSel = inspector.querySelector('#statusSel');
+        if (statusSel) statusSel.addEventListener('change', e => { setStatus(p, item, e.target.value); renderAll(); });
+        const copyPromptBtn = inspector.querySelector('#copyPromptBtn');
+        if (copyPromptBtn) copyPromptBtn.addEventListener('click', e => copyText(item.prompt || '', e.target));
+        const copyModelBtn = inspector.querySelector('#copyModelBtn');
+        if (copyModelBtn) copyModelBtn.addEventListener('click', e => copyText(modelText(item), e.target));
+        const editBtn = inspector.querySelector('#editPromptBtn');
+        if (editBtn) editBtn.addEventListener('click', () => { state.editPrompt = true; renderInspector(); });
+        const saveBtn = inspector.querySelector('#promptSaveBtn');
+        if (saveBtn) saveBtn.addEventListener('click', () => {
+          setPrompt(p, item, inspector.querySelector('#promptEditTa').value.trim());
+          state.editPrompt = false;
+          renderAll();
+        });
+        const cancelBtn = inspector.querySelector('#promptCancelBtn');
+        if (cancelBtn) cancelBtn.addEventListener('click', () => { state.editPrompt = false; renderInspector(); });
+        const modelSel = inspector.querySelector('#modelSel');
+        if (modelSel) modelSel.addEventListener('change', e => { setModelName(p, item, e.target.value); renderAll(); });
+        const modeInput = inspector.querySelector('#modeInput');
+        if (modeInput) modeInput.addEventListener('change', e => { setModelField(p, item, 'mode', e.target.value.trim()); renderInspector(); });
+        const refsInput = inspector.querySelector('#refsInput');
+        if (refsInput) refsInput.addEventListener('change', e => { setModelField(p, item, 'refs', e.target.value.trim()); renderInspector(); });
+        const backBtn = inspector.querySelector('#backCurrentBtn');
+        if (backBtn) backBtn.addEventListener('click', () => { state.selVersion = null; renderInspector(); if (state.tab === 'copy') renderWorkspace(); });
+        inspector.querySelectorAll('[data-ver]').forEach(btn => btn.addEventListener('click', () => {
+          state.selVersion = state.selVersion === Number(btn.dataset.ver) ? null : Number(btn.dataset.ver);
+          renderInspector();
+          if (state.tab === 'copy') renderWorkspace();
+        }));
+        inspector.querySelectorAll('[data-dl-ver]').forEach(btn => btn.addEventListener('click', () => {
+          const ver = item.versions.find(x => x.v === Number(btn.dataset.dlVer));
+          if (ver) downloadVersion(ver, item.title);
+        }));
+        inspector.querySelectorAll('[data-del-ver]').forEach(btn => btn.addEventListener('click', () => {
+          armOr(btn, '确认删除', () => { deleteVersion(p, item, Number(btn.dataset.delVer)); renderAll(); });
+        }));
+        const verFile = inspector.querySelector('#verFile');
+        const verFileBtn = inspector.querySelector('#verFileBtn');
+        if (verFileBtn) {
+          verFileBtn.addEventListener('click', () => verFile.click());
+          verFile.addEventListener('change', () => {
+            inspector.querySelector('#verFileName').textContent = verFile.files.length ? `${verFile.files[0].name}（${(verFile.files[0].size / 1048576).toFixed(1)}MB）` : '未选择（可空）';
+          });
+        }
+        const verForm = inspector.querySelector('#verForm');
+        if (verForm) verForm.addEventListener('submit', async e => {
+          e.preventDefault();
+          const submitBtn = inspector.querySelector('#verSubmitBtn');
+          const file = verFile && verFile.files.length ? verFile.files[0] : null;
+          submitBtn.disabled = true;
+          submitBtn.textContent = file ? '上传中…' : '登记中…';
+          const ok = await addVersion(p, item, verForm.note.value, file);
+          submitBtn.disabled = false;
+          if (ok !== false) { state.insTab = 'vers'; renderAll(); }
+          else renderInspector();
+        });
+        const commentForm = inspector.querySelector('#commentForm');
+        if (commentForm) commentForm.addEventListener('submit', e => {
+          e.preventDefault();
+          const text = e.target.querySelector('textarea').value.trim();
+          if (!text) return;
+          addComment(p, item, text);
+          renderAll();
+        });
+        const delItemBtn = inspector.querySelector('#delItemBtn');
+        if (delItemBtn) delItemBtn.addEventListener('click', () => armOr(delItemBtn, '再点一次确认删除此内容', () => {
+          deleteItem(p, item.id);
+          closeOverlays();
+          renderAll();
+        }));
+        bindInspectorCommon();
+        inspector.scrollTop = 0;
+      }
+      function bindInspectorCommon() {
+        const close = inspector.querySelector('#insClose');
+        if (close) close.addEventListener('click', closeOverlays);
+      }
+
+      /* ---------- 选中 / 抽屉 ---------- */
+      function selectItem(id, focusSec, open) {
+        state.sel = id;
+        state.selVersion = null;
+        state.editPrompt = false;
+        viewRoot.querySelectorAll('[data-item]').forEach(c => c.classList.toggle('selected', c.dataset.item === id));
+        renderInspector(focusSec);
+        if (open !== false) { document.body.classList.add('drawer-open'); document.body.classList.remove('nav-open'); scrim.hidden = false; }
+      }
+      function closeOverlays() {
+        document.body.classList.remove('drawer-open', 'nav-open');
+        scrim.hidden = true;
+      }
+      function openProject(id) {
+        state.projectId = id;
+        const p = getProject();
+        state.tab = 'scenes';
+        state.sceneId = p && p.scenes.length ? p.scenes[0].id : null;
+        state.stageKind = 'image';
+        state.sel = null;
+        state.selVersion = null;
+        state.editPrompt = false;
+        closeOverlays();
+        renderAll();
+      }
+
+      function copyText(text, btn) {
+        const done = () => {
+          if (!btn) return;
+          const t = btn.textContent;
+          btn.textContent = '已复制';
+          setTimeout(() => { btn.textContent = t; }, 1200);
+        };
+        const fallback = () => {
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.cssText = 'position:fixed;opacity:0';
+          document.body.appendChild(ta);
+          ta.select();
+          try { document.execCommand('copy'); done(); } catch (e) {}
+          ta.remove();
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done).catch(fallback);
+        else fallback();
+      }
+
+      function renderAll(focusSec) {
+        renderTopbar();
+        renderSidebar();
+        renderWorkspace();
+        renderInspector(focusSec);
+      }
+
+      /* ---------- 全局事件 ---------- */
+      el('createProjectBtn').addEventListener('click', async () => {
+        const topicId = Number(topicSelect.value);
+        if (!topicId) return;
+        const createBtn = el('createProjectBtn');
+        createBtn.disabled = true;
+        createBtn.textContent = '创建中…';
+        const project = await createProject(topicId, newProjectName.value);
+        createBtn.disabled = false;
+        createBtn.textContent = '从主题新建项目';
+        if (!project) return;
+        newProjectName.value = '';
+        openProject(project.id);
+        state.tab = 'script';
+        state.sel = project.items[0] ? project.items[0].id : null;
+        renderAll();
+        toast(`已创建项目「${project.title}」— 先写分镜脚本，再去「场景」加场景`);
+      });
+      el('modelAddForm').addEventListener('submit', e => {
+        e.preventDefault();
+        const form = e.target;
+        const name = form.name.value.trim();
+        if (!name) return;
+        addModel(form.kind.value, name);
+        form.name.value = '';
+        renderSidebar();
+        renderInspector();
+      });
+      el('meName').addEventListener('change', e => { const v = e.target.value.trim(); if (v) { updateMyProfile({ name: v }); renderAll(); } });
+      el('meRole').addEventListener('change', e => { updateMyProfile({ role: e.target.value }); renderAll(); });
+      el('meAvatarBtn').addEventListener('click', () => el('meAvatarFile').click());
+      el('meAvatarFile').addEventListener('change', async e => {
+        const file = e.target.files && e.target.files[0];
+        e.target.value = '';
+        await uploadMyAvatar(file);
+      });
+      el('meAvatarClear').addEventListener('click', e => armOr(e.target, '确认移除', clearMyAvatar));
+      el('logoutBtn').addEventListener('click', async () => { if (sb) await sb.auth.signOut(); location.reload(); });
+      el('navToggle').addEventListener('click', () => {
+        const open = document.body.classList.toggle('nav-open');
+        document.body.classList.remove('drawer-open');
+        scrim.hidden = !open;
+      });
+      scrim.addEventListener('click', closeOverlays);
+      document.addEventListener('keydown', e => { if (e.key === 'Escape') closeOverlays(); });
+
+      /* ---------- 启动入口 ---------- */
+      if (!window.supabase) {
+        renderGate('setup', '核心组件未能加载，请刷新页面重试。若反复出现，请联系管理员。');
+      } else if (!getConfig()) {
+        renderGate('setup');
+      } else {
+        initClient();
+        (async () => {
+          try {
+            const { data } = await sb.auth.getSession();
+            if (data && data.session) { renderGate('loading'); await boot(data.session); }
+            else renderGate('login');
+          } catch (e) { renderGate('login', '连接失败，请检查网络或服务器配置。'); }
+        })();
+      }
+    })();
+  </script>
+</body>
+</html>
