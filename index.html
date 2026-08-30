@@ -1939,9 +1939,10 @@ ${script}
           <h3>③ 成片 <span class="gk">${vidReady}/${p.scenes.length}</span></h3>
           <p class="pipe-sub">按场景顺序接成一条完整视频，转场用分镜里定好的方式。拼接在你自己电脑上完成，又快又不花钱。</p>
           <div class="pipe-actions">
-            <button class="pill sm accent" type="button" id="exportFilm" ${vidReady ? '' : 'disabled'}>导出成片清单</button>
+            <button class="pill sm accent" type="button" id="exportFilm" ${vidReady && !state.busy['film'] ? '' : 'disabled'}>${state.busy['film'] ? esc(state.busy['film']) : (window.__TAURI__ ? '渲染成片' : '导出成片清单')}</button>
+            ${state.busy['film'] ? '<span class="spin"></span>' : ''}
             <span class="pipe-hint">${vidReady === p.scenes.length && p.scenes.length
-              ? '下载后双击「成片合成」，几分钟后得到完整视频。'
+              ? (window.__TAURI__ ? '直接在本机拼接，完成后成片放到桌面。' : '下载后双击「成片合成」，几分钟后得到完整视频。')
               : (vidReady ? `还有 ${p.scenes.length - vidReady} 个场景没出视频，现在导出只会包含已完成的部分。` : '先把场景视频生成出来。')}</span>
           </div>
         </div>`;
@@ -2045,7 +2046,9 @@ ${script}
             run: () => genSceneImage(p, s, { silent: true }),
             count: () => { const it = sceneItem(getProject(), 'image', s.id); return it ? it.versions.length : 0; }
           })), '批量生成画面'));
-        on('exportFilm', () => {
+        // 桌面版内置 ffmpeg，能直接渲染；网页版只能导出清单让用户双击脚本
+        const isDesktop = () => !!(window.__TAURI__ && window.__TAURI__.core);
+        const buildManifest = () => {
           const clips = [];
           p.scenes.forEach((s, i) => {
             const v = sceneItem(p, 'video', s.id);
@@ -2066,13 +2069,48 @@ ${script}
             output: { width: 1920, height: 1080, fps: 24 },
             clips, audio: { music: null, musicVolume: 0.35 }
           };
-          const blob = new Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json' });
-          const a = document.createElement('a');
-          a.href = URL.createObjectURL(blob);
-          a.download = `成片清单-${(p.title || '未命名').replace(/[\\/:*?"<>|]/g, '_')}.json`;
-          document.body.appendChild(a); a.click(); a.remove();
-          setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-          toast(`清单已下载（${clips.length} 段）。双击「成片合成」即可拼接。`);
+          return manifest;
+        };
+        on('exportFilm', async () => {
+          const manifest = buildManifest();
+          if (!manifest) return;
+          const count = manifest.clips.length;
+
+          if (!isDesktop()) {
+            const blob = new Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `成片清单-${(p.title || '未命名').replace(/[\\/:*?"<>|]/g, '_')}.json`;
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+            toast(`清单已下载（${count} 段）。双击「成片合成」即可拼接。`);
+            return;
+          }
+
+          const { invoke } = window.__TAURI__.core;
+          if (!(await invoke('ffmpeg_ready'))) {
+            toast('缺少 ffmpeg。请在终端运行：brew install ffmpeg');
+            return;
+          }
+          setBusy('film', `准备渲染 ${count} 段…`); renderWorkspace();
+          const STAGE_CN = { download: '下载素材', normalize: '统一规格', join: '拼接与转场', audio: '封装音轨' };
+          let un = null;
+          try {
+            un = await window.__TAURI__.event.listen('render-progress', e => {
+              const d = e.payload || {};
+              const label = STAGE_CN[d.stage] || d.stage;
+              setBusy('film', d.total > 1 ? `${label} ${d.done + 1}/${d.total}` : label);
+              renderWorkspace();
+            });
+            const res = await invoke('render_film', { manifest: JSON.stringify(manifest) });
+            const [file, info] = String(res).split('|');
+            toast(`成片已生成：${info}　已放到桌面`);
+            setBusy('film'); renderAll();
+            window.__TAURI__.opener?.revealItemInDir?.(file);
+          } catch (err) {
+            setBusy('film'); renderAll();
+            toast('渲染失败：' + (err && err.message ? err.message : String(err)));
+          } finally { if (un) un(); }
         });
         on('pipeFinish', async () => { await saveProjectPatch(p, { stage: 'done' }, { stage: 'done' }); toast('流水线完成 — 去「场景」页看成片'); state.tab = 'scenes'; renderWorkspace(); });
       }
