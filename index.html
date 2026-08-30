@@ -665,10 +665,10 @@
         review: { label: '待确认', cls: 's-review' },
         done:   { label: '已完成', cls: 's-done' }
       };
-      const TYPE_LABEL = { script: '剧本文案', image: '画面素材', video: '视频片段', copy: '发布文案', concept: '内容概要' };
+      const TYPE_LABEL = { script: '剧本文案', image: '画面素材', video: '视频片段', copy: '发布文案' };
       const ROLE_LABEL = { script: '脚本 / 统筹', visual: '图像生成', video: '视频生成' };
       const SHORT_ROLE = { script: '统筹', visual: '图像', video: '视频' };
-      const KIND_OF_TYPE = { script: 'text', copy: 'text', image: 'image', video: 'video', concept: 'text' };
+      const KIND_OF_TYPE = { script: 'text', copy: 'text', image: 'image', video: 'video' };
       const KIND_LABEL = { text: '文本', image: '图片', video: '视频' };
       const PROJECT_STATUS = ['筹备中', '制作中', '待发布', '已完成'];
       const AVATAR_COLORS = ['#4d718f', '#8a6a49', '#5e7c70', '#7d5a86', '#3d7a8a', '#a2694d'];
@@ -952,6 +952,9 @@
       const sceneItem = (p, type, sceneId) => p.items.find(i => i.type === type && i.sceneId === sceneId);
       const roleUser = (p, role) => { const m = (p.members || []).find(x => x.role === role); return m ? userById(m.userId) : curUser(); };
       const itemsOf = (p, type) => p.items.filter(i => i.type === type);
+      const CONCEPT_TITLE = '内容概要';
+      const conceptItem = p => itemsOf(p, 'script').find(i => i.title === CONCEPT_TITLE) || null;
+      const scriptItem = p => itemsOf(p, 'script').find(i => i.title !== CONCEPT_TITLE) || null;
       const doneRatio = p => ({ done: p.items.filter(i => i.status === 'done').length, total: p.items.length });
       const modelsOf = kind => db.models.filter(m => m.kind === kind);
       const modelFor = kind => { const m = modelsOf(kind)[0]; return m ? m.name : '待选择'; };
@@ -1545,11 +1548,12 @@
         if (!r.ok) { toast('生成失败：' + r.error); renderWorkspace(); return null; }
         return r;
       }
-      async function ensureTextItem(p, type, title) {
-        let item = itemsOf(p, type)[0];
-        if (item) return item;
+      async function ensureConceptItem(p) { return conceptItem(p) || await createTextItem(p, CONCEPT_TITLE); }
+      async function ensureScriptItem(p) { return scriptItem(p) || await createTextItem(p, '无旁白分镜脚本'); }
+      async function createTextItem(p, title) {
+        const type = 'script';
         const t = now();
-        item = { id: uuid(), type, sceneId: null, title, desc: '', status: 'doing', ownerId: db.currentUserId,
+        const item = { id: uuid(), type, sceneId: null, title, desc: '', status: 'doing', ownerId: db.currentUserId,
           prompt: '', model: { name: 'claude-opus-5', mode: 'AI 流水线', refs: '' },
           versions: [], comments: [], asset: null, createdAt: t, updatedAt: t };
         p.items.push(item);
@@ -1570,8 +1574,8 @@
 
       /* ---------- 分镜结构化生成与落库 ---------- */
       function breakdownPrompt(p) {
-        const concept = latestBody(itemsOf(p, 'concept')[0]);
-        const script = latestBody(itemsOf(p, 'script')[0]);
+        const concept = latestBody(conceptItem(p));
+        const script = latestBody(scriptItem(p));
         return `根据以下无旁白短片剧本，输出分镜与数字资产清单。
 
 主题：${topicLine(p)}
@@ -1670,7 +1674,7 @@ ${script}
         </div>`;
       }
       function paneConcept(p) {
-        const item = itemsOf(p, 'concept')[0];
+        const item = conceptItem(p);
         const text = getDraft('concept', latestBody(item));
         return `<div class="pipe-block">
           <h3>内容概要</h3>
@@ -1686,7 +1690,7 @@ ${script}
         </div>`;
       }
       function paneScript(p) {
-        const item = itemsOf(p, 'script')[0];
+        const item = scriptItem(p);
         const text = getDraft('script', latestBody(item));
         return `<div class="pipe-block">
           <h3>剧本</h3>
@@ -1796,14 +1800,14 @@ ${script}
         on('pipeConceptOk', async () => {
           const text = (el('pipeConcept').value || '').trim();
           if (text.length < 30) { toast('概要太短，先写到 30 字以上'); return; }
-          const item = await ensureTextItem(p, 'concept', '内容概要');
+          const item = await ensureConceptItem(p);
           if (!(await saveTextVersion(p, item, text, `第 ${item.versions.length + 1} 版概要`))) return;
           await saveProjectPatch(p, { stage: 'script' }, { stage: 'script' });
           setDraft('concept', undefined);
           renderWorkspace();
         });
         on('pipeScriptGen', async () => {
-          const concept = latestBody(itemsOf(p, 'concept')[0]);
+          const concept = latestBody(conceptItem(p));
           const r = await pipeGenText(p, 'script-gen', 'script',
             `根据以下概要，为 3 分钟无旁白电影感短片写完整剧本。\n\n主题：${topicLine(p)}\n概要：${concept}\n\n要求：按场景分段（六到十场），每场包含场景小标题与该场发生的具体画面动作；无对白无旁白，靠视觉因果讲述；明确画面母题与光色基调；800 字以内。直接输出剧本正文。`,
             '你是电影短片编剧。');
@@ -1813,7 +1817,7 @@ ${script}
         on('pipeScriptOk', async () => {
           const text = (el('pipeScript').value || '').trim();
           if (text.length < 100) { toast('剧本太短，先写到 100 字以上'); return; }
-          const item = await ensureTextItem(p, 'script', '无旁白分镜脚本');
+          const item = await ensureScriptItem(p);
           if (!(await saveTextVersion(p, item, text, `第 ${item.versions.length + 1} 版剧本`))) return;
           await saveProjectPatch(p, { stage: 'breakdown' }, { stage: 'breakdown' });
           setDraft('script', undefined);
@@ -2036,7 +2040,7 @@ ${script}
       /* ---------- 场景视图 ---------- */
       function stageEntry(p, scene) {
         const kinds = {
-          script: itemsOf(p, 'script')[0] || null,
+          script: scriptItem(p),
           image: sceneItem(p, 'image', scene.id) || null,
           video: sceneItem(p, 'video', scene.id) || null
         };
@@ -2182,7 +2186,7 @@ ${script}
       /* ---------- 脚本视图 ---------- */
       function renderScriptView() {
         const p = getProject();
-        const scriptIt = itemsOf(p, 'script')[0];
+        const scriptIt = scriptItem(p);
         const rows = s => ['action|动作', 'visual|画面', 'sound|声音', 'edit|剪辑'].map(pair => {
           const [key, label] = pair.split('|');
           return s[key] ? `<p class="sp-row"><b>${label}</b>${esc(s[key])}</p>` : '';
