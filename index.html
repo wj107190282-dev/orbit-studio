@@ -714,7 +714,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       /* ---------- 运行时状态 ---------- */
       let sb = null;
       let db = { currentUserId: null, users: [], models: [], projects: [] };
-      const state = { projectId: null, tab: 'scenes', sceneId: null, sel: null, selVersion: null, stageKind: 'image', editPrompt: false, drafts: {}, busy: {}, assetOpen: null };
+      const state = { projectId: null, tab: 'scenes', sceneId: null, sel: null, selVersion: null, stageKind: 'image', editPrompt: false, drafts: {}, busy: {}, busyAt: {}, assetOpen: null };
 
       const el = id => document.getElementById(id);
       const crumb = el('crumb'), barUser = el('barUser');
@@ -1362,6 +1362,46 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
           return data || { ok: false, error: '空响应' };
         } catch (e) { return { ok: false, error: e && e.message ? e.message : String(e) }; }
       }
+      /**
+       * 流式文本。逐段回调 onChunk，界面上就能看着字往外冒，不用干等整篇写完。
+       * supabase-js 的 invoke 不支持流，所以这里直连函数地址。
+       * 流式不可用时返回 null，调用方自动退回一次性调用。
+       */
+      async function callGenerateStream(body, onChunk) {
+        try {
+          const cfg = getConfig();
+          const { data: sess } = await sb.auth.getSession();
+          const token = sess && sess.session ? sess.session.access_token : cfg.anonKey;
+          const res = await fetch(`${cfg.url}/functions/v1/generate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', apikey: cfg.anonKey, Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ ...body, action: 'text_stream' })
+          });
+          if (!res.ok || !res.body) return null;
+          if (!(res.headers.get('content-type') || '').includes('text/event-stream')) return null;
+          const reader = res.body.getReader();
+          const dec = new TextDecoder();
+          let buf = '', text = '';
+          for (;;) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buf += dec.decode(value, { stream: true });
+            const lines = buf.split('\n');
+            buf = lines.pop() || '';
+            for (const line of lines) {
+              const t = line.trim();
+              if (!t.startsWith('data:')) continue;
+              const payload = t.slice(5).trim();
+              if (!payload || payload === '[DONE]') continue;
+              try {
+                const piece = JSON.parse(payload).choices?.[0]?.delta?.content;
+                if (piece) { text += piece; onChunk(text); }
+              } catch (e) { /* 心跳或非 JSON 行，跳过 */ }
+            }
+          }
+          return text ? { ok: true, content: text, model: res.headers.get('X-Model-Used') || '' } : null;
+        } catch (e) { return null; }
+      }
       async function createJob(p, kind, targetTable, targetId, request) {
         const id = uuid();
         await cw(sb.from('jobs').insert({ id, project_id: p.id, kind, target_table: targetTable, target_id: targetId, status: 'running', request, created_by: db.currentUserId }), '记录任务');
@@ -1392,9 +1432,20 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         return null;
       }
       function busyHtml(key, idleLabel) {
-        return state.busy[key] ? `<span class="spin"></span><span class="pipe-hint">${esc(state.busy[key])}</span>` : idleLabel;
+        if (!state.busy[key]) return idleLabel;
+        return `<span class="spin"></span><span class="pipe-hint">${esc(state.busy[key])}<span class="elapsed" data-since="${state.busyAt[key] || Date.now()}"></span></span>`;
       }
-      function setBusy(key, text) { if (text) state.busy[key] = text; else delete state.busy[key]; }
+      function setBusy(key, text) {
+        if (text) { state.busy[key] = text; if (!state.busyAt[key]) state.busyAt[key] = Date.now(); }
+        else { delete state.busy[key]; delete state.busyAt[key]; }
+      }
+      // 每秒刷新一次已用时长。模型生成没有中途进度可报，至少让人知道它还活着。
+      setInterval(() => {
+        document.querySelectorAll('.elapsed').forEach(e => {
+          const s = Math.round((Date.now() - Number(e.dataset.since)) / 1000);
+          e.textContent = ` · 已等 ${s} 秒${s > 90 ? '（比平时久，可能在重试）' : ''}`;
+        });
+      }, 1000);
 
       /* ---------- 资产：写入与生成 ---------- */
       async function registerAssetFile(p, asset, up, label, promptSnap, modelSnap) {
@@ -1616,11 +1667,17 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         const t = topicById(p.topicId);
         return p.topicText || (t ? t.name : p.title);
       }
-      async function pipeGenText(p, key, jobKind, prompt, system) {
+      async function pipeGenText(p, key, jobKind, prompt, system, draftKey, fast) {
         if (state.busy[key]) return null;
-        setBusy(key, '生成中…'); renderWorkspace();
+        setBusy(key, '模型撰写中，通常 30-90 秒'); renderWorkspace();
         const jobId = await createJob(p, jobKind, 'projects', p.id, { prompt: prompt.slice(0, 4000) });
-        const r = await callGenerate({ action: 'text', prompt, system });
+        let r = await callGenerateStream({ prompt, system, fast: !!fast }, partial => {
+          const elId = { concept: 'pipeConcept', script: 'pipeScript' }[draftKey];
+          const ta = elId ? el(elId) : null;
+          if (ta) { ta.value = partial; ta.scrollTop = ta.scrollHeight; }
+          if (draftKey) setDraft(draftKey, partial);
+        });
+        if (!r) r = await callGenerate({ action: 'text', prompt, system });
         await finishJob(jobId, !!r.ok, r.ok ? { model: r.model || '' } : { error: r.error });
         setBusy(key);
         if (!r.ok) { toast('生成失败：' + r.error); renderWorkspace(); return null; }
@@ -1888,7 +1945,7 @@ ${script}
           const t = topicById(p.topicId);
           const r = await pipeGenText(p, 'topic-gen', 'concept',
             `为一支 3 分钟无旁白科普/悬疑短片推荐 5 个主题。\n方向：${brief || '不限'}\n选题分类：${t ? t.name : '不限'}${t ? `\n可参考关键词：${t.tags.slice(0, 10).join('、')}` : ''}\n只输出 JSON：{"topics":[{"title":"主题标题（12字内）","hook":"一句话为什么值得拍"}]}`,
-            '你是短视频选题策划，只输出要求的 JSON，不要任何其他文字。');
+            '你是短视频选题策划，只输出要求的 JSON，不要任何其他文字。', null, true);
           if (!r) return;
           try {
             const d = JSON.parse(stripJson(r.content));
@@ -1911,7 +1968,7 @@ ${script}
         on('pipeConceptGen', async () => {
           const r = await pipeGenText(p, 'concept-gen', 'concept',
             `为主题「${topicLine(p)}」写一段 150-250 字的短片内容概要。${p.brief ? `创作方向：${p.brief}。` : ''}\n这是 3 分钟无旁白电影感短片：说清表达什么、情绪基调如何推进、结尾落在哪。区分已证实事实与未定论之处。直接输出概要正文，不要标题不要解释。`,
-            '你是纪录片策划。');
+            '你是纪录片策划。', 'concept');
           if (r) { setDraft('concept', r.content.trim()); }
           renderWorkspace();
         });
@@ -1928,7 +1985,7 @@ ${script}
           const concept = latestBody(conceptItem(p));
           const r = await pipeGenText(p, 'script-gen', 'script',
             `根据以下概要，为 3 分钟无旁白电影感短片写完整剧本。\n\n主题：${topicLine(p)}\n概要：${concept}\n\n要求：按场景分段（六到十场），每场包含场景小标题与该场发生的具体画面动作；无对白无旁白，靠视觉因果讲述；明确画面母题与光色基调；800 字以内。直接输出剧本正文。`,
-            '你是电影短片编剧。');
+            '你是电影短片编剧。', 'script');
           if (r) { setDraft('script', r.content.trim()); }
           renderWorkspace();
         });
