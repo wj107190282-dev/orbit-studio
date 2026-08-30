@@ -1419,11 +1419,12 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         }
         return rec;
       }
-      async function genAssetImage(p, asset) {
+      async function genAssetImage(p, asset, opt) {
+        const silent = !!(opt && opt.silent);
         const key = `a:${asset.id}`;
         if (state.busy[key]) return;
         if (!asset.prompt) { toast(`「${asset.name}」还没有提示词`); return; }
-        setBusy(key, '生成中…'); renderWorkspace();
+        if (!silent) { setBusy(key, '生成中…'); renderWorkspace(); }
         const jobId = await createJob(p, 'asset_image', 'assets', asset.id, { prompt: asset.prompt });
         const r = await callGenerate({ action: 'image', prompt: asset.prompt });
         if (!r.ok) {
@@ -1433,9 +1434,56 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
           const up = await imageResultToUpload(r);
           const rec = up ? await registerAssetFile(p, asset, up, `AI 生成 · ${r.model}`, asset.prompt, r.model) : null;
           await finishJob(jobId, !!rec, { model: r.model || '', model_tried: JSON.stringify(r.tried || []) });
-          if (rec) toast(`「${asset.name}」已生成（${r.model}）`);
+          if (rec && !silent) toast(`「${asset.name}」已生成（${r.model}）`);
+        }
+        if (!silent) { setBusy(key); renderAll(); }
+      }
+      // 批量生成：先靠第一张校准风格，确认后再把剩下的一次跑完。
+      // 逐个串行执行，任何一步失败就停下来——避免一路错到底烧掉额度。
+      async function runBatch(p, key, jobs, label) {
+        if (state.busy[key]) return;
+        if (!jobs.length) { toast('没有需要生成的项目'); return; }
+        let done = 0;
+        for (const job of jobs) {
+          setBusy(key, `${label} ${done + 1}/${jobs.length}…`); renderWorkspace();
+          const before = job.count();
+          await job.run();
+          if (job.count() === before) { setBusy(key); renderAll(); toast(`${label}中断：第 ${done + 1} 个没成功，先看看提示再继续`); return; }
+          done += 1;
         }
         setBusy(key); renderAll();
+        toast(`${label}完成：${done} 个`);
+      }
+      // 角色三视图：正/侧/背三张同源图。主图仍用正面，另两张作补充参考，
+      // 让角色换机位时也稳得住。只对角色开放——环境和道具用不上。
+      const VIEWS = [
+        ['正面', '正面平视，全身入镜，角色面向镜头，姿态中立'],
+        ['侧面', '正侧面平视，全身入镜，角色朝向画面右侧'],
+        ['背面', '背面平视，全身入镜，展示背部与发型细节']
+      ];
+      async function genAssetViews(p, asset) {
+        const key = `a:${asset.id}`;
+        if (state.busy[key]) return;
+        if (!asset.prompt) { toast(`「${asset.name}」还没有提示词`); return; }
+        let made = 0;
+        for (let i = 0; i < VIEWS.length; i += 1) {
+          const [label, spec] = VIEWS[i];
+          setBusy(key, `三视图 ${i + 1}/3…`); renderWorkspace();
+          const prompt = `${asset.prompt}\n\n机位要求：${spec}。纯色背景，光线均匀，不出现文字、水印。`;
+          const jobId = await createJob(p, 'asset_image', 'assets', asset.id, { prompt, view: label });
+          const r = await callGenerate({ action: 'image', prompt });
+          if (!r.ok) {
+            await finishJob(jobId, false, { error: r.error });
+            setBusy(key); renderAll(); toast(`${label}图生成失败：${r.error}`); return;
+          }
+          const up = await imageResultToUpload(r);
+          const rec = up ? await registerAssetFile(p, asset, up, `三视图 · ${label}`, prompt, r.model) : null;
+          await finishJob(jobId, !!rec, { model: r.model || '', model_tried: JSON.stringify(r.tried || []) });
+          if (!rec) { setBusy(key); renderAll(); toast(`${label}图没能登记，已停下`); return; }
+          made += 1;
+        }
+        setBusy(key); renderAll();
+        toast(`「${asset.name}」三视图已生成（${made} 张）`);
       }
       async function setAssetPrimary(p, asset, fileId) {
         const f = asset.files.find(x => x.id === fileId); if (!f) return;
@@ -1457,7 +1505,8 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       }
 
       /* ---------- 场景画面 / 视频生成 ---------- */
-      async function genSceneImage(p, scene) {
+      async function genSceneImage(p, scene, opt) {
+        const silent = !!(opt && opt.silent);
         const item = sceneItem(p, 'image', scene.id);
         if (!item) { toast('该场景没有画面任务'); return; }
         const prompt = scene.imagePrompt || item.prompt;
@@ -1465,7 +1514,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         const key = `si:${scene.id}`;
         if (state.busy[key]) return;
         const refs = (scene.assetIds || []).map(id => { const a = p.assets.find(x => x.id === id); return a ? a.primarySrc : null; }).filter(Boolean);
-        setBusy(key, '生成画面…'); renderWorkspace();
+        if (!silent) { setBusy(key, '生成画面…'); renderWorkspace(); }
         const jobId = await createJob(p, 'scene_image', 'items', item.id, { prompt, refs: refs.length });
         const r = await callGenerate({ action: 'image', prompt, refImages: refs });
         if (!r.ok) {
@@ -1485,9 +1534,9 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
           }
           if (done && (item.status === 'todo' || item.status === 'doing')) { item.status = 'review'; cw(sb.from('items').update({ status: 'review', updated_at: now() }).eq('id', item.id)); }
           await finishJob(jobId, done, { model: r.model || '', model_tried: JSON.stringify(r.tried || []) });
-          if (done) toast(`「${scene.title}」画面已生成（${r.model}）`);
+          if (done && !silent) toast(`「${scene.title}」画面已生成（${r.model}）`);
         }
-        setBusy(key); renderAll();
+        if (!silent) { setBusy(key); renderAll(); }
       }
       async function registerVideoResult(p, item, url, prompt, model) {
         let up = null;
@@ -1616,9 +1665,33 @@ ${script}
 1. 只输出一个 JSON 对象，不要任何解释、不要 markdown 代码块。
 2. 结构：{"assets":[{"ref_key","kind","name","descr","prompt"}],"scenes":[{"title","time","action","visual","sound","edit","image_prompt","video_prompt","asset_refs":["ref_key"]}]}
 3. assets：整片需要的数字资产。kind 只能是 character / environment / prop；ref_key 用英文小写加下划线并带前缀（char_ / env_ / prop_）；prompt 是给图片模型的生成提示词（中文，含画风、光线、材质约束，写明"不出现文字、水印"）。资产控制在 3-6 个。
-4. scenes：6-10 个场景。time 用 "00:00-00:18" 格式并覆盖全片；image_prompt 描述该场景静帧画面（会以 asset_refs 对应的资产图作参考图）；video_prompt 描述由该静帧出发 5 秒内的镜头运动与画面变化；asset_refs 只引用 assets 里出现过的 ref_key。
-5. 全部使用中文（ref_key 除外）。`;
+4. scenes：6-10 个场景。time 用 "00:00-00:18" 格式并覆盖全片；asset_refs 只引用 assets 里出现过的 ref_key。
+5. 每个场景必须写满八要素，各自一句话，不要留空：
+   subject 主体——这一镜的画面主角是谁/什么，用 assets 里的名字；
+   composition 构图——景别与机位（如"中近景，略微仰拍"）；
+   light 光线——光源方向、明暗与色温；
+   background 背景——环境与景深处理；
+   action 动作——这 5 秒内主体做了什么，要有起止；
+   overlay 文字叠加——需要压在画面上的字幕或标题；没有就写"无"；
+   transition 转场——进入下一镜的方式（硬切/叠化/黑场等）；
+   audio 音频——环境声、音效与音乐情绪。
+6. image_prompt 由前四项加 subject 组合成一句完整的静帧画面描述（会以 asset_refs 对应的资产图作参考图，需注明"不出现文字、水印"）；video_prompt 由 action 加运镜写成 5 秒内的镜头运动描述。
+7. 全部使用中文（ref_key 除外）。`;
       }
+      // 八要素落进现有的 action / visual / sound / edit 四个字段，不需要改数据库
+      function sceneVisual(s) {
+        if (!s.subject && !s.composition && !s.light && !s.background) return s.visual || '';
+        const parts = [];
+        if (s.subject) parts.push('主体：' + s.subject);
+        if (s.composition) parts.push('构图：' + s.composition);
+        if (s.light) parts.push('光线：' + s.light);
+        if (s.background) parts.push('背景：' + s.background);
+        const overlay = (s.overlay || '').trim();
+        if (overlay && !/^无$|^none$/i.test(overlay)) parts.push('文字叠加：' + overlay);
+        return parts.join('　');
+      }
+      const sceneSound = s => s.audio || s.sound || '';
+      const sceneEdit = s => s.transition || s.edit || '';
       function parseBreakdown(text) {
         try {
           const d = JSON.parse(stripJson(text));
@@ -1642,12 +1715,12 @@ ${script}
         for (const s of parsed.scenes) {
           pos += 1;
           const sid = uuid();
-          await cw(sb.from('scenes').insert({ id: sid, project_id: p.id, position: pos, time_code: s.time || '', title: s.title || `场景 ${pos}`, action: s.action || '', visual: s.visual || '', sound: s.sound || '', edit: s.edit || '', image_prompt: s.image_prompt || '', video_prompt: s.video_prompt || '' }), '写入场景');
+          await cw(sb.from('scenes').insert({ id: sid, project_id: p.id, position: pos, time_code: s.time || '', title: s.title || `场景 ${pos}`, action: s.action || '', visual: sceneVisual(s), sound: sceneSound(s), edit: sceneEdit(s), image_prompt: s.image_prompt || '', video_prompt: s.video_prompt || '' }), '写入场景');
           for (const ref of (s.asset_refs || [])) {
             if (refMap[ref]) await cw(sb.from('scene_assets').insert({ scene_id: sid, asset_id: refMap[ref] }), '关联资产');
           }
           const t = now();
-          await cw(sb.from('items').insert({ id: uuid(), project_id: p.id, scene_id: sid, type: 'image', title: `${s.title || `场景 ${pos}`} · 场景图`, descr: s.visual || '', status: 'todo', owner_id: roleUser(p, 'visual').id, prompt: s.image_prompt || '', model_name: 'gpt-image-2-2k', model_mode: '参考图生成', model_refs: (s.asset_refs || []).join(' / '), created_at: t, updated_at: t }), '写入画面任务');
+          await cw(sb.from('items').insert({ id: uuid(), project_id: p.id, scene_id: sid, type: 'image', title: `${s.title || `场景 ${pos}`} · 场景图`, descr: sceneVisual(s), status: 'todo', owner_id: roleUser(p, 'visual').id, prompt: s.image_prompt || '', model_name: 'gpt-image-2-2k', model_mode: '参考图生成', model_refs: (s.asset_refs || []).join(' / '), created_at: t, updated_at: t }), '写入画面任务');
           await cw(sb.from('items').insert({ id: uuid(), project_id: p.id, scene_id: sid, type: 'video', title: `${s.title || `场景 ${pos}`} · 动态镜头`, descr: '', status: 'todo', owner_id: roleUser(p, 'video').id, prompt: s.video_prompt || '', model_name: 'seedance-2.0-fast-480p-933-s-ff', model_mode: '图生视频（首帧）', model_refs: '场景图', created_at: t, updated_at: t }), '写入视频任务');
         }
         await saveProjectPatch(p, { stage: 'generate' }, { stage: 'generate' });
@@ -1774,16 +1847,32 @@ ${script}
             <button class="pill sm" type="button" data-gen-svid="${s.id}" ${iSrc ? '' : 'disabled title="先生成画面"'}>${state.busy[`sv:${s.id}`] ? esc(state.busy[`sv:${s.id}`]) : (vSrc ? '重生成视频' : '生成视频')}</button>
           </div>`;
         }).join('');
+        const assetReady = p.assets.filter(a => a.primarySrc).length;
+        const assetRest = p.assets.filter(a => !a.primarySrc).length;
+        const imgReady = p.scenes.filter(s => { const it = sceneItem(p, 'image', s.id); return it && currentSrc(it); }).length;
+        const imgRest = p.scenes.filter(s => {
+          const it = sceneItem(p, 'image', s.id);
+          const refsOk = (s.assetIds || []).every(id => { const a = p.assets.find(x => x.id === id); return a && a.primarySrc; });
+          return refsOk && !(it && currentSrc(it));
+        }).length;
         const allDone = p.scenes.length && p.scenes.every(s => { const v = sceneItem(p, 'video', s.id); return v && currentSrc(v); });
         return `<div class="pipe-block">
-          <h3>① 数字资产图 <span class="gk">${p.assets.filter(a => a.primarySrc).length}/${p.assets.length}</span></h3>
+          <h3>① 数字资产图 <span class="gk">${assetReady}/${p.assets.length}</span></h3>
           <p class="pipe-sub">先把角色/环境/道具生成出来，它们的主图会作为参考图保证各场景一致。要改提示词去「资产」标签页。</p>
           <div class="gen-rows">${assetRows || '<p class="pipe-hint">没有资产。回上一步生成分镜与资产清单。</p>'}</div>
+          ${p.assets.length ? `<div class="pipe-actions">
+            <button class="pill sm accent" type="button" id="batchAssets" ${assetReady && assetRest ? '' : 'disabled'}>${state.busy['batch-a'] ? esc(state.busy['batch-a']) : `批量生成剩余 ${assetRest} 个`}</button>
+            <span class="pipe-hint">${assetReady ? (assetRest ? '风格已经定下来了，剩下的可以一次跑完。' : '资产图都齐了。') : '先单独生成一张当校准帧，风格满意了再批量——不满意就改提示词重生成，能省不少额度。'}</span>
+          </div>` : ''}
         </div>
         <div class="pipe-block">
           <h3>② 场景画面与视频</h3>
           <p class="pipe-sub">画面 = 提示词 + 该场景资产参考图；视频 = 画面当首帧 + 运镜提示词（Seedance，约 1-3 分钟）。每个场景可单独重生成。</p>
           <div class="gen-rows">${sceneRows || '<p class="pipe-hint">没有场景。</p>'}</div>
+          ${p.scenes.length ? `<div class="pipe-actions">
+            <button class="pill sm accent" type="button" id="batchImgs" ${imgReady && imgRest ? '' : 'disabled'}>${state.busy['batch-i'] ? esc(state.busy['batch-i']) : `批量生成剩余 ${imgRest} 张画面`}</button>
+            <span class="pipe-hint">${imgReady ? (imgRest ? '首帧风格已确认，剩下的可以一次跑完。' : '画面都齐了，逐个生成视频即可。') : '先生成第一张画面校准风格，满意后再批量。'}</span>
+          </div>` : ''}
           <div class="pipe-actions"><span style="flex:1"></span>
             ${allDone ? '<button class="pill sm solid" type="button" id="pipeFinish">完成流水线</button>' : '<span class="pipe-hint">全部场景出片后可标记完成</span>'}
           </div>
@@ -1874,6 +1963,20 @@ ${script}
           const s = sceneById(p, b.dataset.genSvid);
           if (s) genSceneVideo(p, s);
         }));
+        on('batchAssets', () => runBatch(p, 'batch-a',
+          p.assets.filter(a => !a.primarySrc).map(a => ({
+            run: () => genAssetImage(p, a, { silent: true }),
+            count: () => { const cur = (getProject().assets || []).find(x => x.id === a.id); return cur ? cur.files.length : 0; }
+          })), '批量生成资产图'));
+        on('batchImgs', () => runBatch(p, 'batch-i',
+          p.scenes.filter(s => {
+            const it = sceneItem(p, 'image', s.id);
+            const refsOk = (s.assetIds || []).every(id => { const a = p.assets.find(x => x.id === id); return a && a.primarySrc; });
+            return refsOk && !(it && currentSrc(it));
+          }).map(s => ({
+            run: () => genSceneImage(p, s, { silent: true }),
+            count: () => { const it = sceneItem(getProject(), 'image', s.id); return it ? it.versions.length : 0; }
+          })), '批量生成画面'));
         on('pipeFinish', async () => { await saveProjectPatch(p, { stage: 'done' }, { stage: 'done' }); toast('流水线完成 — 去「场景」页看成片'); state.tab = 'scenes'; renderWorkspace(); });
       }
 
@@ -1894,7 +1997,8 @@ ${script}
                 <div class="asset-foot">
                   ${statusWord(a.status)}
                   <span style="flex:1"></span>
-                  <button class="pill sm" type="button" data-gen-asset="${a.id}">${state.busy[`a:${a.id}`] ? '生成中…' : '生成'}</button>
+                  <button class="pill sm" type="button" data-gen-asset="${a.id}">${state.busy[`a:${a.id}`] ? esc(state.busy[`a:${a.id}`]) : '生成'}</button>
+                  ${a.kind === 'character' ? `<button class="pill sm" type="button" data-gen-views="${a.id}" title="正面/侧面/背面各一张，主图用正面">三视图</button>` : ''}
                   <button class="mini-link" type="button" data-asset-open="${a.id}">${open ? '收起' : '详情'}</button>
                 </div>
                 ${open ? `<div class="asset-expand">
@@ -1914,6 +2018,10 @@ ${script}
         viewRoot.querySelectorAll('[data-gen-asset]').forEach(b => b.addEventListener('click', () => {
           const a = p.assets.find(x => x.id === b.dataset.genAsset);
           if (a) genAssetImage(p, a);
+        }));
+        viewRoot.querySelectorAll('[data-gen-views]').forEach(b => b.addEventListener('click', () => {
+          const a = p.assets.find(x => x.id === b.dataset.genViews);
+          if (a) genAssetViews(p, a);
         }));
         viewRoot.querySelectorAll('[data-asset-open]').forEach(b => b.addEventListener('click', () => {
           state.assetOpen = state.assetOpen === b.dataset.assetOpen ? null : b.dataset.assetOpen;
