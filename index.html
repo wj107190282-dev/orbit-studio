@@ -738,7 +738,9 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       function initClient() {
         const cfg = getConfig();
         if (!cfg || !window.supabase) return false;
-        sb = window.supabase.createClient(cfg.url, cfg.anonKey);
+        sb = window.supabase.createClient(cfg.url, cfg.anonKey, {
+          auth: { persistSession: true, autoRefreshToken: true, storageKey: 'orbitAuth_v1' }
+        });
         return true;
       }
       function renderGate(mode, msg) {
@@ -771,23 +773,29 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
           <span class="gate-brand">ORBIT STUDIO</span>
           <h1>登录</h1>
           <p class="gate-sub">用团队约定的邮箱登录；第一次使用点「注册新账号」。</p>
-          <input class="st-input" id="authEmail" type="email" placeholder="邮箱" autocomplete="email" />
-          <input class="st-input" id="authPass" type="password" placeholder="密码（至少 6 位）" autocomplete="current-password" />
-          <p class="gate-err" id="gateErr">${esc(msg || '')}</p>
-          <div class="gate-actions">
-            <button class="pill solid" type="button" id="loginBtn">登录</button>
-            <button class="pill" type="button" id="signupBtn">注册新账号</button>
-          </div>
+          <form id="loginForm" autocomplete="on">
+            <input class="st-input" id="authEmail" name="username" type="email" placeholder="邮箱" autocomplete="username" required />
+            <input class="st-input" id="authPass" name="password" type="password" placeholder="密码（至少 6 位）" autocomplete="current-password" required />
+            <p class="gate-err" id="gateErr">${esc(msg || '')}</p>
+            <div class="gate-actions">
+              <button class="pill solid" type="submit" id="loginBtn">登录</button>
+              <button class="pill" type="button" id="signupBtn">注册新账号</button>
+            </div>
+          </form>
 `;
         const err = t => { el('gateErr').textContent = t; };
         const creds = () => ({ email: el('authEmail').value.trim(), password: el('authPass').value });
-        el('loginBtn').addEventListener('click', async () => {
+        const LAST_EMAIL_KEY = 'orbitLastEmail_v1';
+        try { el('authEmail').value = localStorage.getItem(LAST_EMAIL_KEY) || ''; } catch (e) {}
+        el('loginForm').addEventListener('submit', async e => {
+          e.preventDefault();
           const c = creds();
           if (!c.email || !c.password) { err('请填写邮箱和密码'); return; }
           el('loginBtn').textContent = '登录中…';
           const { data, error } = await sb.auth.signInWithPassword(c);
           el('loginBtn').textContent = '登录';
           if (error) { err('登录失败：' + error.message); return; }
+          try { localStorage.setItem(LAST_EMAIL_KEY, c.email); } catch (e2) {}
           renderGate('loading');
           boot(data.session);
         });
@@ -803,7 +811,6 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         });
         const cfgResetBtn = el('cfgResetBtn');
         if (cfgResetBtn) cfgResetBtn.addEventListener('click', () => { localStorage.removeItem(CONFIG_KEY); renderGate('setup'); });
-        el('authPass').addEventListener('keydown', e => { if (e.key === 'Enter') el('loginBtn').click(); });
       }
 
       /* ---------- 云端读取 ---------- */
