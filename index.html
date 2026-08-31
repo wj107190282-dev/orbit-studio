@@ -431,6 +431,38 @@
     .asset-files img { width: 52px; height: 30px; object-fit: cover; display: block; border: 1px solid #d3ccbd; }
     .asset-files button.primary { border-color: var(--ac); }
     .asset-expand { border-top: 1px dashed #ddd7cb; margin-top: 9px; padding-top: 9px; }
+    /* ---- 剪辑台 ---- */
+    .cut-wrap { display: flex; flex-direction: column; gap: 14px; padding-bottom: 10px; }
+    .cut-stage { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 16px; align-items: start; }
+    @media (max-width: 900px) { .cut-stage { grid-template-columns: 1fr; } }
+    .cut-screen { position: relative; background: #17150f; border: 1px solid #d3ccbd; aspect-ratio: 16 / 9; overflow: hidden; }
+    .cut-screen video { width: 100%; height: 100%; object-fit: contain; display: block; background: #17150f; }
+    .cut-screen .ph3 { position: absolute; inset: 0; display: grid; place-items: center; color: #8c857a; font-size: 12px; }
+    .cut-side { border: 1px solid #ddd7cb; background: #faf9f5; padding: 14px 15px; }
+    .cut-side h4 { margin: 0 0 3px; font-size: 13px; font-weight: 700; }
+    .cut-side .rk2 { color: #a49c8e; font: 400 9px/1.5 "IBM Plex Mono", Menlo, monospace; }
+    .cut-field { margin-top: 12px; }
+    .cut-field label { display: block; font-size: 10.5px; color: #6e675d; margin-bottom: 4px; }
+    .cut-row { display: flex; gap: 6px; align-items: center; }
+    .cut-num { width: 66px; border: 1px solid #d3ccbd; border-radius: 4px; background: #fff; padding: 5px 7px; font: 500 11px "Space Grotesk", monospace; color: #2f2b22; outline: none; font-variant-numeric: tabular-nums; }
+    .cut-num:focus { border-color: var(--ac); }
+    .cut-sel { border: 1px solid #d3ccbd; border-radius: 4px; background: #fff; padding: 5px 7px; font-size: 11px; color: #2f2b22; outline: none; }
+    .cut-tl { border: 1px solid #ddd7cb; background: #f0ece2; padding: 12px 14px 14px; overflow-x: auto; }
+    .cut-track { position: relative; display: flex; align-items: stretch; height: 54px; min-width: 640px; gap: 0; }
+    .cut-clip { position: relative; height: 100%; border: 1px solid var(--ac); background: var(--ac-metal, var(--ac)); color: #f3f1ec; display: flex; flex-direction: column; justify-content: center; padding: 0 9px; overflow: hidden; cursor: pointer; min-width: 34px; box-sizing: border-box; }
+    .cut-clip b { font-size: 10.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .cut-clip span { font: 400 8.5px/1.4 "Space Grotesk", monospace; opacity: .8; font-variant-numeric: tabular-nums; }
+    .cut-clip.sel { outline: 2px solid #2c7a52; outline-offset: -2px; }
+    .cut-clip .grip { position: absolute; top: 0; bottom: 0; width: 7px; cursor: ew-resize; background: rgba(243, 241, 236, .45); }
+    .cut-clip .grip:hover, .cut-clip .grip.active { background: #2c7a52; }
+    .cut-clip .grip.l { left: 0; } .cut-clip .grip.r { right: 0; }
+    .cut-gap { flex: none; width: 16px; display: grid; place-items: center; cursor: pointer; }
+    .cut-gap i { display: block; width: 10px; height: 26px; border-radius: 2px; background: #ddd7cb; border: 1px solid #cfc8b8; font-style: normal; }
+    .cut-gap.xf i { background: repeating-linear-gradient(135deg, var(--ac) 0 2px, #f0ece2 2px 4px); border-color: var(--ac); }
+    .cut-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .cut-total { font: 600 12px "Space Grotesk", monospace; font-variant-numeric: tabular-nums; }
+    .cut-hint { color: #a49c8e; font-size: 10.5px; }
+    .cut-warn { color: #a5482f; font-size: 11px; }
     @media (max-width: 1180px) {
       .collab-shell { padding: 0 28px; }
       .stage-info { width: 320px; }
@@ -714,7 +746,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       /* ---------- 运行时状态 ---------- */
       let sb = null;
       let db = { currentUserId: null, users: [], models: [], projects: [] };
-      const state = { projectId: null, tab: 'scenes', sceneId: null, sel: null, selVersion: null, stageKind: 'image', editPrompt: false, drafts: {}, busy: {}, busyAt: {}, assetOpen: null };
+      const state = { projectId: null, tab: 'scenes', sceneId: null, sel: null, selVersion: null, stageKind: 'image', editPrompt: false, drafts: {}, busy: {}, busyAt: {}, assetOpen: null, cutSel: null, cutMusic: null, cutPlaying: false, clipDur: {} };
 
       const el = id => document.getElementById(id);
       const crumb = el('crumb'), barUser = el('barUser');
@@ -979,10 +1011,30 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       const sceneNo = (p, id) => { const i = p.scenes.findIndex(s => s.id === id); return i < 0 ? null : i + 1; };
       const sceneItem = (p, type, sceneId) => p.items.find(i => i.type === type && i.sceneId === sceneId);
       const roleUser = (p, role) => { const m = (p.members || []).find(x => x.role === role); return m ? userById(m.userId) : curUser(); };
-      const itemsOf = (p, type) => p.items.filter(i => i.type === type);
+      const EDL_TITLE = '剪辑表';
+      const itemsOf = (p, type) => p.items.filter(i => i.type === type && i.title !== EDL_TITLE);
+      const edlItem = p => p.items.find(i => i.type === 'script' && i.title === EDL_TITLE) || null;
       const landingTab = p => (p && p.scenes.length) ? 'scenes' : 'pipeline';
       const CONCEPT_TITLE = '内容概要';
       const conceptItem = p => itemsOf(p, 'script').find(i => i.title === CONCEPT_TITLE) || null;
+      const edlOf = p => { try { return JSON.parse(latestBody(edlItem(p)) || '{}'); } catch (e) { return {}; } };
+      /** 某个场景的剪辑参数；没剪过就是整段用、按分镜里写的转场 */
+      function cutOf(p, s) {
+        const d = edlOf(p)[s.id] || {};
+        return {
+          in: Number(d.in) || 0,
+          out: (d.out == null || d.out === '') ? null : Number(d.out),
+          xf: d.xf == null ? (/叠化|淡|溶|渐/.test(s.edit || '') ? 0.5 : 0) : Number(d.xf),
+          order: d.order
+        };
+      }
+      /** 写回剪辑表。每次保存产生一个新版本，随时能回到上一版。 */
+      async function saveCut(p, sceneId, patch) {
+        const edl = edlOf(p);
+        edl[sceneId] = { ...(edl[sceneId] || {}), ...patch };
+        const item = edlItem(p) || await createTextItem(p, EDL_TITLE);
+        return saveTextVersion(p, item, JSON.stringify(edl), '剪辑调整');
+      }
       const scriptItem = p => itemsOf(p, 'script').find(i => i.title !== CONCEPT_TITLE) || null;
       const doneRatio = p => ({ done: p.items.filter(i => i.status === 'done').length, total: p.items.length });
       const modelsOf = kind => db.models.filter(m => m.kind === kind);
@@ -1788,6 +1840,354 @@ ${script}
         renderAllPreserve();
       }
 
+      /* ---------- 成片导出（流水线与剪辑台共用） ---------- */
+      const isDesktop = () => !!(window.__TAURI__ && window.__TAURI__.core);
+
+      /** 按剪辑表生成渲染清单：顺序、入出点、转场全部取自剪辑台的调整 */
+      function buildManifest(p) {
+        const rows = cutScenes(p);
+        if (!rows.length) { toast('还没有可用的场景视频'); return null; }
+        const clips = rows.map((x, i) => ({
+          n: i + 1, title: x.s.title || `场景 ${i + 1}`, url: currentSrc(x.item),
+          in: x.cut.in || 0,
+          out: x.cut.out == null ? null : x.cut.out,
+          transition: i < rows.length - 1
+            ? { type: x.cut.xf ? 'dissolve' : 'cut', duration: x.cut.xf || 0.5 }
+            : { type: 'cut' },
+          transitionLabel: x.s.edit || '', note: x.s.action || ''
+        }));
+        return {
+          project: p.title || '未命名', exportedAt: now(),
+          output: { width: 1920, height: 1080, fps: 24 },
+          clips,
+          audio: { music: state.cutMusic || null, music_volume: 0.35, musicVolume: 0.35 }
+        };
+      }
+
+      async function exportFilm(p) {
+        const manifest = buildManifest(p);
+        if (!manifest) return;
+        const count = manifest.clips.length;
+
+        if (!isDesktop()) {
+          const blob = new Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json' });
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = `成片清单-${(p.title || '未命名').replace(/[\\/:*?"<>|]/g, '_')}.json`;
+          document.body.appendChild(a); a.click(); a.remove();
+          setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+          toast(`清单已下载（${count} 段）。双击「成片合成」即可拼接。`);
+          return;
+        }
+
+        const { invoke } = window.__TAURI__.core;
+        if (!(await invoke('ffmpeg_ready'))) { toast('缺少 ffmpeg。请在终端运行：brew install ffmpeg'); return; }
+        setBusy('film', `准备渲染 ${count} 段…`); renderWorkspace();
+        const STAGE_CN = { download: '下载素材', normalize: '统一规格', join: '拼接与转场', audio: '封装音轨' };
+        let un = null;
+        try {
+          un = await window.__TAURI__.event.listen('render-progress', e => {
+            const d = e.payload || {};
+            setBusy('film', d.total > 1 ? `${STAGE_CN[d.stage] || d.stage} ${d.done + 1}/${d.total}` : (STAGE_CN[d.stage] || d.stage));
+            renderWorkspace();
+          });
+          const res = await invoke('render_film', { manifest: JSON.stringify(manifest) });
+          const [file, info] = String(res).split('|');
+          setBusy('film'); renderAll();
+          toast(`成片已生成：${info}　已放到桌面`);
+          window.__TAURI__.opener?.revealItemInDir?.(file);
+        } catch (err) {
+          setBusy('film'); renderAll();
+          toast('渲染失败：' + (err && err.message ? err.message : String(err)));
+        } finally { if (un) un(); }
+      }
+
+      /* =====================================================================
+         剪辑台：把 AI 生成的片段修成能看的片子。
+         最要紧的是掐头去尾 —— AI 出的五秒片段，开头结尾常有废帧。
+         所有调整只记参数，原始片段一帧不动，改多少次都能反悔。
+         ===================================================================== */
+
+      /** 场景在成片里的排列顺序（剪辑表里改过顺序就按它，否则按场景本身的顺序） */
+      function cutScenes(p) {
+        return p.scenes
+          .map((s, i) => ({ s, i, cut: cutOf(p, s), item: sceneItem(p, 'video', s.id) }))
+          .filter(x => x.item && currentSrc(x.item))
+          .sort((a, b) => {
+            const ao = a.cut.order == null ? a.i : a.cut.order;
+            const bo = b.cut.order == null ? b.i : b.cut.order;
+            return ao - bo || a.i - b.i;
+          });
+      }
+
+      /** 某段修剪后的时长；拿不到原始时长时按 5 秒估（Seedance 默认长度） */
+      function clipLen(x) {
+        const raw = state.clipDur[x.s.id] || 5;
+        const out = x.cut.out == null ? raw : Math.min(x.cut.out, raw);
+        return Math.max(0.2, out - (x.cut.in || 0));
+      }
+
+      /** 成片总时长：片段之和减去转场重叠的部分 */
+      function filmLength(rows) {
+        const sum = rows.reduce((a, x) => a + clipLen(x), 0);
+        const olap = rows.slice(0, -1).reduce((a, x) => a + (x.cut.xf || 0), 0);
+        return Math.max(0, sum - olap);
+      }
+
+      const fmtT = sec => {
+        const s = Math.max(0, sec);
+        return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}.${String(Math.floor((s % 1) * 10))}`;
+      };
+
+      function renderCutView() {
+        const p = getProject();
+        const rows = cutScenes(p);
+
+        if (!rows.length) {
+          viewRoot.innerHTML = `<div class="view-head"><h2>剪辑台</h2><span class="gk">CUT</span></div>
+            <div class="ws-empty"><h2>还没有可剪的素材</h2>先在「AI 流水线」里把每个场景的视频生成出来，这里会自动排成一条时间线。</div>`;
+          return;
+        }
+
+        if (!state.cutSel || !rows.some(x => x.s.id === state.cutSel)) state.cutSel = rows[0].s.id;
+        const cur = rows.find(x => x.s.id === state.cutSel);
+        const total = filmLength(rows);
+        const totalRaw = rows.reduce((a, x) => a + (state.clipDur[x.s.id] || 5), 0);
+        const saved = totalRaw - rows.reduce((a, x) => a + clipLen(x), 0);
+
+        // 时间线：每段宽度按时长比例，段间的方块是转场
+        const track = rows.map((x, idx) => {
+          const w = (clipLen(x) / Math.max(total, 0.1)) * 100;
+          const gap = idx < rows.length - 1
+            ? `<span class="cut-gap ${x.cut.xf ? 'xf' : ''}" data-gap="${x.s.id}" title="${x.cut.xf ? `叠化 ${x.cut.xf} 秒` : '硬切'}（点击切换）"><i></i></span>`
+            : '';
+          return `<span class="cut-clip ${x.s.id === state.cutSel ? 'sel' : ''}" data-clip="${x.s.id}" style="flex:0 0 ${w.toFixed(2)}%">
+              <span class="grip l" data-grip="in:${x.s.id}"></span>
+              <b>S${String(idx + 1).padStart(2, '0')} ${esc(x.s.title || '')}</b>
+              <span>${fmtT(clipLen(x))}</span>
+              <span class="grip r" data-grip="out:${x.s.id}"></span>
+            </span>${gap}`;
+        }).join('');
+
+        const src = cur ? currentSrc(cur.item) : null;
+        const raw = state.clipDur[cur.s.id] || 5;
+
+        viewRoot.innerHTML = `
+          <div class="view-head"><h2>剪辑台</h2><span class="gk">CUT / ${rows.length}</span></div>
+          <div class="cut-wrap">
+            <div class="cut-stage">
+              <div class="cut-screen">
+                ${src ? `<video id="cutVideo" src="${esc(src)}" preload="metadata" controls playsinline></video>`
+                      : '<span class="ph3">这一段还没有视频</span>'}
+              </div>
+              <div class="cut-side">
+                <h4>S${String(rows.indexOf(cur) + 1).padStart(2, '0')} ${esc(cur.s.title || '')}</h4>
+                <span class="rk2">${esc(cur.s.time || '')} · 原片 ${fmtT(raw)}</span>
+
+                <div class="cut-field">
+                  <label>入点 / 出点（秒）</label>
+                  <div class="cut-row">
+                    <input class="cut-num" id="cutIn" type="number" step="0.1" min="0" value="${(cur.cut.in || 0).toFixed(1)}" />
+                    <span class="cut-hint">→</span>
+                    <input class="cut-num" id="cutOut" type="number" step="0.1" min="0" value="${(cur.cut.out == null ? raw : cur.cut.out).toFixed(1)}" />
+                  </div>
+                  <div class="cut-row" style="margin-top:6px">
+                    <button class="pill sm" type="button" id="cutSetIn">此处设入点</button>
+                    <button class="pill sm" type="button" id="cutSetOut">此处设出点</button>
+                  </div>
+                  <p class="cut-hint" style="margin:6px 0 0">播放到想要的位置，点上面的按钮。也可以直接拖时间线上片段的左右边缘。</p>
+                </div>
+
+                <div class="cut-field">
+                  <label>与下一段之间</label>
+                  <div class="cut-row">
+                    <select class="cut-sel" id="cutXfType" ${rows.indexOf(cur) === rows.length - 1 ? 'disabled' : ''}>
+                      <option value="0" ${cur.cut.xf ? '' : 'selected'}>硬切</option>
+                      <option value="1" ${cur.cut.xf ? 'selected' : ''}>叠化</option>
+                    </select>
+                    <input class="cut-num" id="cutXfDur" type="number" step="0.1" min="0.1" max="2"
+                      value="${(cur.cut.xf || 0.5).toFixed(1)}" ${cur.cut.xf ? '' : 'disabled'} />
+                    <span class="cut-hint">秒</span>
+                  </div>
+                </div>
+
+                <div class="cut-field">
+                  <label>顺序</label>
+                  <div class="cut-row">
+                    <button class="pill sm" type="button" id="cutUp" ${rows.indexOf(cur) === 0 ? 'disabled' : ''}>← 前移</button>
+                    <button class="pill sm" type="button" id="cutDown" ${rows.indexOf(cur) === rows.length - 1 ? 'disabled' : ''}>后移 →</button>
+                  </div>
+                </div>
+
+                <div class="cut-field">
+                  <button class="st-linkbtn" type="button" id="cutReset">还原这一段</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="cut-tl">
+              <div class="cut-track">${track}</div>
+            </div>
+
+            <div class="cut-bar">
+              <span class="cut-total">成片 ${fmtT(total)}</span>
+              <span class="cut-hint">${saved > 0.2 ? `已裁掉 ${saved.toFixed(1)} 秒废帧` : '还没裁剪'}</span>
+              <span style="flex:1"></span>
+              <button class="pill sm" type="button" id="cutPreview">${state.cutPlaying ? '停止预览' : '预览全片'}</button>
+              <button class="pill sm accent" type="button" id="cutRender">${state.busy['film'] ? esc(state.busy['film']) : (window.__TAURI__ ? '渲染成片' : '导出成片清单')}</button>
+            </div>
+            ${state.cutMusic ? `<p class="cut-hint">配乐：${esc(state.cutMusic.split('/').pop())} · <button class="st-linkbtn" type="button" id="cutMusicClear">移除</button></p>`
+              : (window.__TAURI__ ? '<p class="cut-hint"><button class="st-linkbtn" type="button" id="cutMusicPick">选择配乐…</button>（可选）</p>' : '')}
+          </div>`;
+
+        bindCutView(p, rows, cur);
+      }
+
+      function bindCutView(p, rows, cur) {
+        const video = el('cutVideo');
+        const raw = () => state.clipDur[cur.s.id] || 5;
+
+        // 读到真实时长后重画一次，时间线宽度才准确
+        if (video) {
+          video.addEventListener('loadedmetadata', () => {
+            if (video.duration && Math.abs((state.clipDur[cur.s.id] || 0) - video.duration) > 0.05) {
+              state.clipDur[cur.s.id] = video.duration;
+              renderWorkspace();
+            }
+          });
+          video.currentTime = cur.cut.in || 0;
+          // 播到出点自动停，方便反复确认这一段留了什么
+          video.addEventListener('timeupdate', () => {
+            const out = cur.cut.out == null ? raw() : cur.cut.out;
+            if (!state.cutPlaying && video.currentTime >= out) video.pause();
+          });
+        }
+
+        const save = async patch => { await saveCut(p, cur.s.id, patch); renderWorkspace(); };
+
+        const onNum = (id, key) => {
+          const e = el(id);
+          if (e) e.addEventListener('change', () => {
+            const v = parseFloat(e.value);
+            if (!Number.isFinite(v) || v < 0) { renderWorkspace(); return; }
+            save({ [key]: key === 'out' && v >= raw() ? null : v });
+          });
+        };
+        onNum('cutIn', 'in');
+        onNum('cutOut', 'out');
+
+        const on2 = (id, fn) => { const e = el(id); if (e) e.addEventListener('click', fn); };
+        on2('cutSetIn', () => video && save({ in: Math.round(video.currentTime * 10) / 10 }));
+        on2('cutSetOut', () => video && save({ out: Math.round(video.currentTime * 10) / 10 }));
+        on2('cutReset', () => save({ in: 0, out: null, xf: null }));
+
+        const xt = el('cutXfType');
+        if (xt) xt.addEventListener('change', () => save({ xf: xt.value === '1' ? (parseFloat(el('cutXfDur').value) || 0.5) : 0 }));
+        const xd = el('cutXfDur');
+        if (xd) xd.addEventListener('change', () => save({ xf: Math.min(2, Math.max(0.1, parseFloat(xd.value) || 0.5)) }));
+
+        // 顺序：把相邻两段的序号对调，写回剪辑表
+        const move = async dir => {
+          const i = rows.indexOf(cur), j = i + dir;
+          if (j < 0 || j >= rows.length) return;
+          const a = rows[i], b = rows[j];
+          const ao = a.cut.order == null ? a.i : a.cut.order;
+          const bo = b.cut.order == null ? b.i : b.cut.order;
+          await saveCut(p, a.s.id, { order: bo });
+          await saveCut(p, b.s.id, { order: ao });
+          renderWorkspace();
+        };
+        on2('cutUp', () => move(-1));
+        on2('cutDown', () => move(1));
+
+        viewRoot.querySelectorAll('[data-clip]').forEach(e => e.addEventListener('click', ev => {
+          if (ev.target.classList.contains('grip')) return;
+          state.cutSel = e.dataset.clip; state.cutPlaying = false; renderWorkspace();
+        }));
+        viewRoot.querySelectorAll('[data-gap]').forEach(e => e.addEventListener('click', () => {
+          const x = rows.find(r => r.s.id === e.dataset.gap);
+          if (x) saveCut(p, x.s.id, { xf: x.cut.xf ? 0 : 0.5 }).then(renderWorkspace);
+        }));
+
+        bindGrips(p, rows);
+        on2('cutPreview', () => playFilm(p, rows));
+        on2('cutRender', () => exportFilm(p));
+        on2('cutMusicPick', async () => {
+          const f = await window.__TAURI__.core.invoke('pick_music');
+          if (f) { state.cutMusic = f; renderWorkspace(); }
+        });
+        on2('cutMusicClear', () => { state.cutMusic = null; renderWorkspace(); });
+      }
+
+      /** 拖片段边缘裁切。按时间线的像素宽度换算成秒。 */
+      function bindGrips(p, rows) {
+        viewRoot.querySelectorAll('[data-grip]').forEach(g => {
+          g.addEventListener('pointerdown', ev => {
+            ev.preventDefault(); ev.stopPropagation();
+            const [side, sid] = g.dataset.grip.split(':');
+            const x = rows.find(r => r.s.id === sid);
+            if (!x) return;
+            const clip = g.closest('.cut-clip');
+            const pxPerSec = clip.getBoundingClientRect().width / Math.max(clipLen(x), 0.2);
+            const startX = ev.clientX;
+            const raw = state.clipDur[sid] || 5;
+            const from = side === 'in' ? (x.cut.in || 0) : (x.cut.out == null ? raw : x.cut.out);
+            g.classList.add('active');
+            g.setPointerCapture(ev.pointerId);
+
+            const move = e => {
+              const d = (e.clientX - startX) / Math.max(pxPerSec, 1);
+              let v = Math.round((from + d) * 10) / 10;
+              const inV = x.cut.in || 0;
+              const outV = x.cut.out == null ? raw : x.cut.out;
+              v = side === 'in' ? Math.max(0, Math.min(v, outV - 0.3)) : Math.max(inV + 0.3, Math.min(v, raw));
+              // 拖动时只改本地显示，松手才写库 —— 避免拖一次存几十个版本
+              if (side === 'in') x.cut.in = v; else x.cut.out = v;
+              clip.querySelector('span:not(.grip)').textContent = fmtT(clipLen(x));
+              const lbl = el(side === 'in' ? 'cutIn' : 'cutOut');
+              if (lbl) lbl.value = v.toFixed(1);
+            };
+            const up = async () => {
+              g.classList.remove('active');
+              g.removeEventListener('pointermove', move);
+              g.removeEventListener('pointerup', up);
+              const v = side === 'in' ? x.cut.in : x.cut.out;
+              await saveCut(p, sid, side === 'in' ? { in: v } : { out: v >= raw ? null : v });
+              renderWorkspace();
+            };
+            g.addEventListener('pointermove', move);
+            g.addEventListener('pointerup', up);
+          });
+        });
+      }
+
+      /** 全片预览：一段放完自动切下一段，按入出点播。 */
+      async function playFilm(p, rows) {
+        const video = el('cutVideo');
+        if (!video) return;
+        if (state.cutPlaying) { state.cutPlaying = false; video.pause(); renderWorkspace(); return; }
+        state.cutPlaying = true; renderWorkspace();
+        for (const x of rows) {
+          if (!state.cutPlaying) break;
+          state.cutSel = x.s.id;
+          const v = el('cutVideo');
+          if (!v) break;
+          const src = currentSrc(x.item);
+          if (v.src !== src) { v.src = src; await new Promise(r => v.addEventListener('loadedmetadata', r, { once: true })); }
+          const raw = v.duration || 5;
+          const out = x.cut.out == null ? raw : x.cut.out;
+          v.currentTime = x.cut.in || 0;
+          await v.play().catch(() => {});
+          await new Promise(res => {
+            const t = () => { if (!state.cutPlaying || v.currentTime >= out) { v.removeEventListener('timeupdate', t); res(); } };
+            v.addEventListener('timeupdate', t);
+            v.addEventListener('ended', () => { v.removeEventListener('timeupdate', t); res(); }, { once: true });
+          });
+        }
+        state.cutPlaying = false;
+        renderWorkspace();
+      }
+
       /* ---------- 流水线视图 ---------- */
       function renderPipelineView() {
         const p = getProject();
@@ -2046,72 +2446,7 @@ ${script}
             run: () => genSceneImage(p, s, { silent: true }),
             count: () => { const it = sceneItem(getProject(), 'image', s.id); return it ? it.versions.length : 0; }
           })), '批量生成画面'));
-        // 桌面版内置 ffmpeg，能直接渲染；网页版只能导出清单让用户双击脚本
-        const isDesktop = () => !!(window.__TAURI__ && window.__TAURI__.core);
-        const buildManifest = () => {
-          const clips = [];
-          p.scenes.forEach((s, i) => {
-            const v = sceneItem(p, 'video', s.id);
-            const src = v ? currentSrc(v) : null;
-            if (!src) return;
-            // 转场取自分镜的「剪辑」字段；写了叠化/淡入淡出就做叠化，否则硬切
-            const dissolve = /叠化|淡|溶|渐/.test(s.edit || '');
-            clips.push({
-              n: i + 1, title: s.title || `场景 ${i + 1}`, url: src,
-              in: 0, out: null,
-              transition: { type: dissolve ? 'dissolve' : 'cut', duration: 0.5 },
-              transitionLabel: s.edit || '', caption: '', note: s.action || ''
-            });
-          });
-          if (!clips.length) { toast('还没有可用的场景视频'); return; }
-          const manifest = {
-            project: p.title || '未命名', exportedAt: now(),
-            output: { width: 1920, height: 1080, fps: 24 },
-            clips, audio: { music: null, musicVolume: 0.35 }
-          };
-          return manifest;
-        };
-        on('exportFilm', async () => {
-          const manifest = buildManifest();
-          if (!manifest) return;
-          const count = manifest.clips.length;
-
-          if (!isDesktop()) {
-            const blob = new Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json' });
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = `成片清单-${(p.title || '未命名').replace(/[\\/:*?"<>|]/g, '_')}.json`;
-            document.body.appendChild(a); a.click(); a.remove();
-            setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-            toast(`清单已下载（${count} 段）。双击「成片合成」即可拼接。`);
-            return;
-          }
-
-          const { invoke } = window.__TAURI__.core;
-          if (!(await invoke('ffmpeg_ready'))) {
-            toast('缺少 ffmpeg。请在终端运行：brew install ffmpeg');
-            return;
-          }
-          setBusy('film', `准备渲染 ${count} 段…`); renderWorkspace();
-          const STAGE_CN = { download: '下载素材', normalize: '统一规格', join: '拼接与转场', audio: '封装音轨' };
-          let un = null;
-          try {
-            un = await window.__TAURI__.event.listen('render-progress', e => {
-              const d = e.payload || {};
-              const label = STAGE_CN[d.stage] || d.stage;
-              setBusy('film', d.total > 1 ? `${label} ${d.done + 1}/${d.total}` : label);
-              renderWorkspace();
-            });
-            const res = await invoke('render_film', { manifest: JSON.stringify(manifest) });
-            const [file, info] = String(res).split('|');
-            toast(`成片已生成：${info}　已放到桌面`);
-            setBusy('film'); renderAll();
-            window.__TAURI__.opener?.revealItemInDir?.(file);
-          } catch (err) {
-            setBusy('film'); renderAll();
-            toast('渲染失败：' + (err && err.message ? err.message : String(err)));
-          } finally { if (un) un(); }
-        });
+        on('exportFilm', () => exportFilm(p));
         on('pipeFinish', async () => { await saveProjectPatch(p, { stage: 'done' }, { stage: 'done' }); toast('流水线完成 — 去「场景」页看成片'); state.tab = 'scenes'; renderWorkspace(); });
       }
 
@@ -2300,11 +2635,12 @@ ${script}
           ['assets', '资产', p.assets.length],
           ['images', '图片', itemsOf(p, 'image').length],
           ['videos', '视频片段', itemsOf(p, 'video').length],
+          ['cut', '剪辑', cutScenes(p).length],
           ['copy', '文案版本', itemsOf(p, 'copy').reduce((n, i) => n + i.versions.length, 0)]
         ];
         viewTabs.innerHTML = tabs.map(([key, label, count]) => `<button type="button" class="${state.tab === key ? 'active' : ''}" data-tab="${key}">${label}<span class="cnt">${count}</span></button>`).join('');
         viewTabs.querySelectorAll('[data-tab]').forEach(btn => btn.addEventListener('click', () => { state.tab = btn.dataset.tab; renderWorkspace(); }));
-        const views = { scenes: renderScenesView, script: renderScriptView, images: renderImagesView, videos: renderVideosView, copy: renderCopyView, assets: renderAssetsView, pipeline: renderPipelineView };
+        const views = { scenes: renderScenesView, script: renderScriptView, images: renderImagesView, videos: renderVideosView, copy: renderCopyView, assets: renderAssetsView, pipeline: renderPipelineView, cut: renderCutView };
         views[state.tab]();
         bindItemCards();
       }
